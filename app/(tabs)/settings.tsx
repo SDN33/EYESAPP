@@ -13,17 +13,20 @@ export default function SettingsScreen() {
   const [mode, setMode] = useState<"moto" | "voiture">("moto");
   // TODO: lire ce mode depuis profil user/storage si besoin
 
+  const colorScheme = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  const isDark = colorScheme === 'dark';
+
   return (
-    <View style={{ flex: 1, padding: 24 }}>
+    <View style={{ flex: 1, padding: 24, backgroundColor: isDark ? '#111216' : '#fff' }}>
       {/* Profil et avatar */}
       <View style={{ alignItems: "center", marginBottom: 20 }}>
         <View style={{
-          width: 80, height: 80, borderRadius: 40, backgroundColor: "#e0e0e0", 
+          width: 80, height: 80, borderRadius: 40, backgroundColor: isDark ? "#23242A" : "#e0e0e0",
           alignItems: "center", justifyContent: "center", marginBottom: 10
         }}>
-          <Text style={{ fontSize: 34 }}>{user?.name?.[0]?.toUpperCase() || "?"}</Text>
+          <Text style={{ fontSize: 34, color: isDark ? "#fff" : "#222" }}>{user?.name?.[0]?.toUpperCase() || "?"}</Text>
         </View>
-        <Text style={{ fontWeight: "bold", fontSize: 18 }}>
+        <Text style={{ fontWeight: "bold", fontSize: 18, color: isDark ? "#fff" : "#222" }}>
           {user?.name || "Utilisateur invité"}
         </Text>
         {isPremium && <Text style={{ color: "#7654f6", fontWeight: "bold" }}>Premium ⭐</Text>}
@@ -38,31 +41,6 @@ export default function SettingsScreen() {
         )}
       </View>
 
-      {/* Mode d'utilisation */}
-      <View style={{ marginBottom: 20 }}>
-        <Text style={{ fontWeight: "bold" }}>Mode d’utilisation :</Text>
-        <View style={{ flexDirection: "row", alignItems: "center", marginTop: 8 }}>
-          <TouchableOpacity
-            onPress={() => setMode("moto")}
-            style={{
-              padding: 10, borderRadius: 8, marginRight: 8,
-              backgroundColor: mode === "moto" ? "#2196f3" : "#eee"
-            }}
-          >
-            <Text style={{ color: mode === "moto" ? "#fff" : "#222" }}>Moto</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setMode("voiture")}
-            style={{
-              padding: 10, borderRadius: 8,
-              backgroundColor: mode === "voiture" ? "#2196f3" : "#eee"
-            }}
-          >
-            <Text style={{ color: mode === "voiture" ? "#fff" : "#222" }}>Voiture</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
       {/* Premium */}
       {!isPremium && (
         <View style={{ marginBottom: 20 }}>
@@ -72,26 +50,26 @@ export default function SettingsScreen() {
 
       {/* Consentement RGPD */}
       <View style={{ marginBottom: 20 }}>
-        <Text>Consentement données : {hasConsent ? "Accepté" : "Non donné"}</Text>
+        <Text style={{ color: isDark ? "#fff" : "#222" }}>Consentement données : {hasConsent ? "Accepté" : "Non donné"}</Text>
         {!hasConsent && <Button title="Donner mon consentement" onPress={acceptConsent} />}
       </View>
 
       {/* Liens utiles */}
       <View style={{ marginBottom: 20 }}>
         <TouchableOpacity onPress={() => {/* TODO: Open privacy policy */}}>
-          <Text style={{ color: "#2176ff" }}>Voir la politique de confidentialité</Text>
+          <Text style={{ color: isDark ? "#60A5FA" : "#2176ff" }}>Voir la politique de confidentialité</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => {/* TODO: Open CGU */}}>
-          <Text style={{ color: "#2176ff" }}>Voir les CGU</Text>
+          <Text style={{ color: isDark ? "#60A5FA" : "#2176ff" }}>Voir les CGU</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => {/* TODO: Open feedback mail */}}>
-          <Text style={{ color: "#2176ff" }}>Envoyer un feedback</Text>
+          <Text style={{ color: isDark ? "#60A5FA" : "#2176ff" }}>Envoyer un feedback</Text>
         </TouchableOpacity>
       </View>
 
       {/* Version de l'app */}
       <View style={{ alignItems: "center", marginTop: 32 }}>
-        <Text style={{ color: "#aaa" }}>Version 1.0.0</Text>
+        <Text style={{ color: isDark ? "#aaa" : "#888" }}>Version 1.0.0</Text>
       </View>
     </View>
   );
