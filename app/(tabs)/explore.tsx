@@ -1,20 +1,18 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { View, Text } from "react-native";
-import { useLocation } from "../../hooks/useLocation";
+import { useAnalytics } from "../../hooks/useAnalytics";
+import { AnalyticsEvents } from "../../constants/AnalyticsEvents";
 
 export default function ExploreScreen() {
-  const { location, error } = useLocation();
+  const track = useAnalytics();
+
+  useEffect(() => {
+    track(AnalyticsEvents.OPEN_TAB("explore"));
+  }, []);
 
   return (
-    <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+    <View>
       <Text>Détection Moto</Text>
-      {error && <Text style={{ color: "red" }}>{error}</Text>}
-      {location && (
-        <Text>
-          Latitude: {location.coords.latitude}{"\n"}
-          Longitude: {location.coords.longitude}
-        </Text>
-      )}
     </View>
   );
 }

@@ -1,13 +1,12 @@
-export const PREMIUM_FEATURES = [
-    {
-      key: "priority-alert",
-      label: "Alerte prioritaire",
-      desc: "Soyez notifié en priorité lors de la détection d'une moto à proximité."
-    },
-    {
-      key: "community-pro",
-      label: "Accès communauté premium",
-      desc: "Participez aux discussions réservées aux membres premium."
-    },
-  ];
-  
+export const PremiumFeatures = [
+  {
+    key: "priority-alert",
+    label: "Alerte prioritaire",
+    description: "Soyez notifié en priorité des motos dangereuses proches."
+  },
+  {
+    key: "community-pro",
+    label: "Accès communauté premium",
+    description: "Participez aux discussions premium de la communauté."
+  },
+];
