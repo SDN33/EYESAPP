@@ -1,19 +1,3 @@
-import React, { useEffect } from "react";
-import { View, Text } from "react-native";
-import { useAnalytics } from "../../hooks/useAnalytics";
-import { AnalyticsEvents } from "../../constants/AnalyticsEvents";
-
-export default function ExploreScreen() {
-  const track = useAnalytics();
-
-  useEffect(() => {
-    track(AnalyticsEvents.OPEN_TAB("explore"));
-  }, []);
-
-  return (
-    <View>
-      <Text>Détection Moto</Text>
-    </View>
-  );
-}
+// Ce fichier n'est plus utile car la page explore est maintenant dans index.tsx (devenu ExploreScreen)
+// On le retire pour éviter les doublons
 
