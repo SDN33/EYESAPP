@@ -48,7 +48,7 @@ export default function ExploreVoitureScreen() {
         {/* Alerte radar */}
         <View style={styles.radarAlertBox}>
           <View style={styles.radarAlertIcon}><Ionicons name="alert-circle" size={20} color="#fff" /></View>
-          <Text style={styles.radarAlertText}>Radar à proximité</Text>
+          <Text style={styles.radarAlertText}>Une Moto est à proximité</Text>
           <Text style={styles.radarAlertDist}>120 m</Text>
         </View>
       </View>

@@ -51,7 +51,7 @@ export default function ExploreMotoScreen() {
         {/* Alerte radar */}
         <View style={styles.radarAlertBox}>
           <View style={styles.radarAlertIcon}><Ionicons name="alert-circle" size={20} color="#fff" /></View>
-          <Text style={styles.radarAlertText}>Une Moto est à proximité</Text>
+          <Text style={styles.radarAlertText}>Une Auto est à proximité</Text>
           <Text style={styles.radarAlertDist}>50 m</Text>
         </View>
       </View>
