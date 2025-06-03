@@ -11,7 +11,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import MapView, { PROVIDER_GOOGLE } from "../../components/common/MapView";
 import { Ionicons } from '@expo/vector-icons';
 
-export default function HomeScreen() {
+export default function ExploreScreen() {
   const { hasConsent, acceptConsent } = useConsent();
   const [mode, setMode] = useState<string | null>(null);
   const [modeModalVisible, setModeModalVisible] = useState(true); // Toujours true au départ
