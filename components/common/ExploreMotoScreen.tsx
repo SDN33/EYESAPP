@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, Easing, Platform, Dimensions } from "react-native";
+import { View, Text, StyleSheet, Easing, Platform, Dimensions, TouchableOpacity, FlatList, Modal } from "react-native";
 import Animated, { useSharedValue, withTiming } from "react-native-reanimated";
 import { useLocation } from "../../hooks/useLocation";
 import { useLeanAngle } from "../../hooks/useLeanAngle";
@@ -44,7 +44,8 @@ export default function ExploreMotoScreen() {
         .catch(() => setSpeedLimit(null));
     }
   }, [location?.coords]);
-  const isOverLimit = speedLimit !== null && speed > speedLimit;
+  // Calcul sécurisé du dépassement de la limite
+  const isOverLimit = typeof speedLimit === 'number' && !isNaN(speedLimit) && speed > speedLimit;
 
   // TODO: Replace these with real detection logic or props
   const leftDetected = true;
@@ -52,6 +53,19 @@ export default function ExploreMotoScreen() {
 
   const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
   const isSmallScreen = screenWidth < 370 || screenHeight < 700;
+
+  // Mock d'alertes communautaires (à remplacer par backend plus tard)
+  const [alerts, setAlerts] = useState([]); // plus d'alertes sur la carte
+  const [showAlertModal, setShowAlertModal] = useState(false);
+
+  // Ajout d'une alerte (mock, à remplacer par API)
+  const handleAddAlert = (type: string) => {
+    // Désactivé : on ne stocke plus les alertes
+    setShowAlertModal(false);
+  };
+
+  // Affichage d'une notification si une alerte communautaire (danger/bouchon) est proche (< 300m)
+  const nearbyAlert = undefined; // plus de notif communautaire
 
   if (hasConsent === false) {
     return <ConsentModal visible onAccept={acceptConsent} />;
@@ -79,13 +93,24 @@ export default function ExploreMotoScreen() {
           </View>
         </View>
         <View style={[styles.limitsRow, isSmallScreen && { marginBottom: 2, gap: 6 }] }>
-          <View style={[styles.limitBadge, isOverLimit ? styles.limitBadgeOver : {}, isSmallScreen && { width: 32, height: 32, borderRadius: 16, borderWidth: 2 }] }>
-            <Text style={[styles.limitBadgeText, isOverLimit ? styles.limitBadgeTextOver : {}, { color: "#A259FF" }, isSmallScreen && { fontSize: 12 }] }>{speedLimit !== null ? speedLimit : "—"}</Text>
+          <View style={[
+            styles.limitBadge,
+            isOverLimit ? styles.limitBadgeOver : {},
+            isSmallScreen && { width: 32, height: 32, borderRadius: 16, borderWidth: 2 }
+          ]}>
+            <Text style={[
+              styles.limitBadgeText,
+              isOverLimit ? styles.limitBadgeTextOver : {},
+              { color: isOverLimit ? '#EF4444' : '#A259FF' },
+              isSmallScreen && { fontSize: 12 }
+            ]}>
+              {typeof speedLimit === 'number' && !isNaN(speedLimit) ? speedLimit : '—'}
+            </Text>
           </View>
           <Text style={[styles.limitLabel, isSmallScreen && { fontSize: 11 }]}>Limite de vitesse</Text>
         </View>
-        {/* Alerte radar moderne et dynamique (véhicule à proximité) */}
-        {leftDetected || rightDetected ? (
+        {/* Alerte radar moderne et dynamique (véhicule à proximité uniquement) */}
+        {(leftDetected || rightDetected) ? (
           <View style={{
             marginTop: isSmallScreen ? 6 : 16,
             alignSelf: 'center',
@@ -95,7 +120,7 @@ export default function ExploreMotoScreen() {
             paddingVertical: isSmallScreen ? 8 : 14,
             flexDirection: 'row',
             alignItems: 'center',
-            shadowColor: '#A259FF',
+            shadowColor: leftDetected || rightDetected ? '#A259FF' : '#23242A',
             shadowOpacity: 0.18,
             shadowRadius: 12,
             borderWidth: 1.5,
@@ -149,6 +174,49 @@ export default function ExploreMotoScreen() {
             <Ionicons name="locate" size={28} color="#A259FF" onPress={() => {window.dispatchEvent(new CustomEvent('recenter-map'));}} />
           </View>
         </View>
+        {/* Bouton flottant signalement, discret en haut à gauche */}
+        <TouchableOpacity
+          style={{ position: 'absolute', top: 18, left: 18, backgroundColor: '#23242A', borderRadius: 18, padding: 8, shadowColor: '#000', shadowOpacity: 0.10, shadowRadius: 4, zIndex: 30, opacity: 0.85 }}
+          onPress={() => setShowAlertModal(true)}
+        >
+          <Ionicons name="alert" size={20} color="#A259FF" />
+        </TouchableOpacity>
+        {/* Modal choix type d'alerte */}
+        <Modal visible={showAlertModal} transparent animationType="fade">
+          <View style={{ flex:1, backgroundColor:'#0008', justifyContent:'center', alignItems:'center' }}>
+            <View style={{ backgroundColor:'#181A20', borderRadius:18, padding:24, minWidth:220 }}>
+              <Text style={{ color:'#fff', fontWeight:'bold', fontSize:18, marginBottom:12 }}>Signaler…</Text>
+              {/* On retire le signalement radar */}
+              <TouchableOpacity onPress={() => handleAddAlert('danger')} style={{ flexDirection:'row', alignItems:'center', marginBottom:14 }}>
+                <Ionicons name="warning" size={22} color="#F59E42" style={{ marginRight:8 }} />
+                <Text style={{ color:'#fff', fontSize:16 }}>Danger</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => handleAddAlert('bouchon')} style={{ flexDirection:'row', alignItems:'center', marginBottom:6 }}>
+                <Ionicons name="car" size={22} color="#60A5FA" style={{ marginRight:8 }} />
+                <Text style={{ color:'#fff', fontSize:16 }}>Bouchon</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setShowAlertModal(false)} style={{ marginTop:10, alignSelf:'flex-end' }}>
+                <Text style={{ color:'#aaa', fontSize:15 }}>Annuler</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+        {/* Liste des alertes à proximité (danger/bouchon uniquement) */}
+        {/* <View style={{ position:'absolute', left:0, right:0, bottom:90, alignItems:'center', zIndex:25 }}>
+          <FlatList
+            data={alerts.filter(a => a.type !== 'radar')}
+            keyExtractor={item => item.id.toString()}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            renderItem={({item}) => (
+              <View style={{ backgroundColor:'#23242A', borderRadius:12, padding:10, marginHorizontal:6, flexDirection:'row', alignItems:'center', minWidth:90 }}>
+                <Ionicons name={item.type==='danger' ? 'warning' : 'car'} size={18} color={item.type==='danger' ? '#F59E42' : '#60A5FA'} style={{ marginRight:6 }} />
+                <Text style={{ color:'#fff', fontSize:14 }}>{item.type.charAt(0).toUpperCase()+item.type.slice(1)}</Text>
+                <Text style={{ color:'#aaa', fontSize:13, marginLeft:8 }}>{item.distance} m</Text>
+              </View>
+            )}
+          />
+        </View> */}
       </View>
       {/* Affichage adresse actuelle en bas, en overlay absolu pour ne pas crop la map */}
       {address ? (
