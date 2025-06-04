@@ -78,17 +78,21 @@ export default function MapView({ color = "#A259FF" }: { color?: string }) {
 
   useEffect(() => {
     // Nettoyage robuste du marker à chaque update ou unmount
+    // Correction : ce useEffect ne doit dépendre de rien (array vide) pour éviter tout effet de bord React
     return () => {
       if (markerRef.current) {
         try {
-          markerRef.current.remove();
+          const el = markerRef.current.getElement();
+          if (el && el.parentNode && el.parentNode.contains(el)) {
+            markerRef.current.remove();
+          }
         } catch (e) {
           // Ignore si déjà supprimé
         }
         markerRef.current = null;
       }
     };
-  }, [lat, lon, location?.coords?.heading, color]);
+  }, []);
 
   useEffect(() => {
     if (!mapRef.current || !location?.coords) return;
