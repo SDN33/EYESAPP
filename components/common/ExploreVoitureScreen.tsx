@@ -239,9 +239,9 @@ export default function ExploreVoitureScreen() {
             }} />
           </View>
         </View>
-        {/* Bouton flottant signalement, discret en haut à gauche */}
+        {/* Bouton flottant signalement, discret en haut à gauche (descendu pour éviter le chevauchement avec la notif trafic) */}
         <TouchableOpacity
-          style={{ position: 'absolute', top: 18, left: 18, backgroundColor: '#23242A', borderRadius: 18, padding: 8, shadowColor: '#000', shadowOpacity: 0.10, shadowRadius: 4, zIndex: 30, opacity: 0.85 }}
+          style={{ position: 'absolute', top: 58, left: 18, backgroundColor: '#23242A', borderRadius: 18, padding: 8, shadowColor: '#000', shadowOpacity: 0.10, shadowRadius: 4, zIndex: 30, opacity: 0.85 }}
           onPress={() => setShowAlertModal(true)}
         >
           <Ionicons name="alert" size={20} color="#60A5FA" />
