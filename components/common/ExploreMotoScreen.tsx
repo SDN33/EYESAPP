@@ -236,7 +236,11 @@ export default function ExploreMotoScreen() {
         <View style={{ position: 'absolute', top: 18, right: 64, zIndex: 20 }}>
           <View style={{ backgroundColor: '#23242A', borderRadius: 24, padding: 8, shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 6 }}>
             <Ionicons name="locate" size={28} color="#A259FF" onPress={() => {
-              setRecenterKey(k => k + 1);
+              if (Platform.OS === 'web') {
+                window.dispatchEvent(new Event('recenter-map'));
+              } else {
+                setRecenterKey(k => k + 1);
+              }
             }} />
           </View>
         </View>

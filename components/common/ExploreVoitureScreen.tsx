@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, Easing, Platform, Dimensions, TouchableOpacity, FlatList, Modal } from "react-native";
+import { View, Text, StyleSheet, Easing, Dimensions, TouchableOpacity, FlatList, Modal } from "react-native";
 import Animated, { useSharedValue, withTiming } from "react-native-reanimated";
 import Svg, { Path, Circle, Defs, LinearGradient, Stop, RadialGradient } from "react-native-svg";
 import { useLocation } from "../../hooks/useLocation";
@@ -11,6 +11,12 @@ import { getAddressFromCoords, getSpeedLimitFromCoords } from "../../utils/roadI
 import { getWeatherFromCoords } from "../../services/api";
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useLeanAngle } from "../../hooks/useLeanAngle";
+import { Platform } from "react-native";
+
+// Clé Google API pour le trafic (web ou mobile)
+const GOOGLE_API_KEY = Platform.OS === "web"
+  ? "AIzaSyBmVBiIzMDvK9U6Xf3mHCo33KGLXeC8FK0"
+  : (process.env.GOOGLE_API_KEY || "");
 
 export default function ExploreVoitureScreen() {
   const { hasConsent, acceptConsent } = useConsent();
@@ -24,6 +30,7 @@ export default function ExploreVoitureScreen() {
   const [alerts, setAlerts] = useState([]); // plus d'alertes sur la carte
   const [showAlertModal, setShowAlertModal] = useState(false);
   const [recenterKey, setRecenterKey] = useState(0);
+  const [trafficAlert, setTrafficAlert] = useState<string | null>(null);
 
   const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
   const isSmallScreen = screenWidth < 370 || screenHeight < 700;
@@ -80,6 +87,40 @@ export default function ExploreVoitureScreen() {
 
   // Affichage d'une notification si une alerte communautaire (danger/bouchon) est proche (< 300m)
   const nearbyAlert = undefined; // plus de notif communautaire
+
+  // Détection trafic en temps réel (web uniquement, mock sur mobile)
+  useEffect(() => {
+    if (!location?.coords) return;
+    let interval: any;
+    async function checkTraffic() {
+      if (!location?.coords) return;
+      try {
+        const { latitude, longitude } = location.coords;
+        // On simule un trajet de 1km vers le nord
+        const destLat = latitude + 0.009;
+        const destLon = longitude;
+        const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${latitude},${longitude}&destination=${destLat},${destLon}&departure_time=now&key=${GOOGLE_API_KEY}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.routes && data.routes[0] && data.routes[0].legs && data.routes[0].legs[0]) {
+          const leg = data.routes[0].legs[0];
+          const duration = leg.duration.value; // en secondes
+          const durationInTraffic = leg.duration_in_traffic?.value || duration;
+          // Si le temps en trafic est 50% plus long que le temps normal, on notifie
+          if (durationInTraffic > duration * 1.5) {
+            setTrafficAlert("Trafic dense détecté à proximité");
+          } else {
+            setTrafficAlert(null);
+          }
+        }
+      } catch {
+        setTrafficAlert(null);
+      }
+    }
+    checkTraffic();
+    interval = setInterval(checkTraffic, 30000); // toutes les 30s
+    return () => clearInterval(interval);
+  }, [location?.coords]);
 
   if (hasConsent === false) {
     return <ConsentModal visible onAccept={acceptConsent} />;
@@ -250,6 +291,15 @@ export default function ExploreVoitureScreen() {
           </Text>
         </View>
       ) : null}
+      {/* Notification trafic en temps réel */}
+      {trafficAlert && (
+        <View style={{ position: 'absolute', top: 18, left: 0, right: 0, alignItems: 'center', zIndex: 50 }}>
+          <View style={{ backgroundColor: '#F59E42', borderRadius: 16, paddingHorizontal: 18, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 8, elevation: 3 }}>
+            <Ionicons name="car" size={22} color="#fff" style={{ marginRight: 10 }} />
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>{trafficAlert}</Text>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
