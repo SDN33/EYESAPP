@@ -105,7 +105,10 @@ export default function ExploreMotoScreen() {
         // On simule un trajet de 1km vers le nord
         const destLat = latitude + 0.009;
         const destLon = longitude;
-        const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${latitude},${longitude}&destination=${destLat},${destLon}&departure_time=now&key=${GOOGLE_API_KEY}`;
+        let url = `https://maps.googleapis.com/maps/api/directions/json?origin=${latitude},${longitude}&destination=${destLat},${destLon}&departure_time=now&key=${GOOGLE_API_KEY}`;
+        if (typeof window !== 'undefined') {
+          url = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+        }
         const res = await fetch(url);
         const data = await res.json();
         if (data.routes && data.routes[0] && data.routes[0].legs && data.routes[0].legs[0]) {

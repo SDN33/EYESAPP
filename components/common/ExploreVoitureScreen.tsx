@@ -99,7 +99,10 @@ export default function ExploreVoitureScreen() {
         // On simule un trajet de 1km vers le nord
         const destLat = latitude + 0.009;
         const destLon = longitude;
-        const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${latitude},${longitude}&destination=${destLat},${destLon}&departure_time=now&key=${GOOGLE_API_KEY}`;
+        let url = `https://maps.googleapis.com/maps/api/directions/json?origin=${latitude},${longitude}&destination=${destLat},${destLon}&departure_time=now&key=${GOOGLE_API_KEY}`;
+        if (typeof window !== 'undefined') {
+          url = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+        }
         const res = await fetch(url);
         const data = await res.json();
         if (data.routes && data.routes[0] && data.routes[0].legs && data.routes[0].legs[0]) {
@@ -235,7 +238,11 @@ export default function ExploreVoitureScreen() {
         <View style={{ position: 'absolute', top: 18, right: 64, zIndex: 20 }}>
           <View style={{ backgroundColor: '#23242A', borderRadius: 24, padding: 8, shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 6 }}>
             <Ionicons name="locate" size={28} color="#2979FF" onPress={() => {
-              setRecenterKey(k => k + 1);
+              if (Platform.OS === 'web') {
+                window.dispatchEvent(new Event('recenter-map'));
+              } else {
+                setRecenterKey(k => k + 1);
+              }
             }} />
           </View>
         </View>
