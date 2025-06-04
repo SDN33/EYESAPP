@@ -8,9 +8,10 @@ import { Ionicons } from "@expo/vector-icons";
 
 MapboxGL.setAccessToken(""); // Pas besoin de token pour les styles libres OSM/MapTiler
 
-const OSM_STYLE = "https://tiles.stadiamaps.com/styles/alidade_smooth_dark.json"; // Style sombre, minimaliste, open source
+// Style OSM dark compatible mobile/web, sans sprite, public
+const OSM_STYLE = "https://demotiles.maplibre.org/style.json";
 
-export default function MapView() {
+export default function MapView({ color = "#A259FF" }: { color?: string }) {
   const { location } = useLocation();
   const mapRef = useRef(null);
   const [centered, setCentered] = useState(true);
@@ -18,20 +19,7 @@ export default function MapView() {
   const lon = location?.coords?.longitude ?? 2.2945;
 
   // Toujours afficher le marker, même si la carte n'est pas centrée
-  useEffect(() => {
-    if (centered && mapRef.current && location?.coords) {
-      (mapRef.current as any).setCamera({ centerCoordinate: [lon, lat], zoomLevel: 16, animationDuration: 800 });
-    }
-  }, [lat, lon, centered]);
-
-  // Bouton recentrer
-  const handleRecenter = () => {
-    setCentered(true);
-    if (mapRef.current && location?.coords) {
-      (mapRef.current as any).setCamera({ centerCoordinate: [lon, lat], zoomLevel: 16, animationDuration: 800 });
-    }
-  };
-
+  // (le marker dépend uniquement de location?.coords)
   return (
     <View style={{ flex: 1 }}>
       <MapboxGL.MapView
@@ -52,22 +40,16 @@ export default function MapView() {
           animationMode="flyTo"
           animationDuration={800}
         />
-        {/* Marker toujours visible */}
+        {/* Marker toujours visible, couleur dynamique */}
         {location?.coords && (
           <MapboxGL.PointAnnotation id="me" coordinate={[lon, lat]}>
             <View style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name="navigate" size={28} color="#A259FF" style={{ transform: [{ rotate: `${location?.coords?.heading ?? 0}deg` }] }} />
+              <Ionicons name="navigate" size={28} color={color} style={{ transform: [{ rotate: `${location?.coords?.heading ?? 0}deg` }] }} />
               <View style={{ position: 'absolute', width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: '#fff', opacity: 0.7 }} />
             </View>
           </MapboxGL.PointAnnotation>
         )}
       </MapboxGL.MapView>
-      {/* Bouton recentrer */}
-      <View style={{ position: 'absolute', bottom: 24, right: 18, zIndex: 10 }}>
-        <View style={{ backgroundColor: '#23242A', borderRadius: 24, padding: 8, shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 6 }}>
-          <Ionicons name="locate" size={28} color="#A259FF" onPress={handleRecenter} />
-        </View>
-      </View>
     </View>
   );
 }

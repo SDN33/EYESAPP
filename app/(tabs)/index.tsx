@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, Animated, TouchableOpacity } from "react-native";
+import { View, Animated, TouchableOpacity, Platform } from "react-native";
 import ModeSelectionModal from "../../components/common/ModeSelectionModal";
 import { useConsent } from "../../hooks/useConsent";
 import ConsentModal from "../../components/common/ConsentModal";
@@ -18,8 +18,8 @@ export default function ExploreScreen() {
   const switchMode = (newMode: "motard" | "voiture") => {
     if (newMode === mode) return;
     Animated.sequence([
-      Animated.timing(fadeAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
-      Animated.timing(fadeAnim, { toValue: 1, duration: 220, useNativeDriver: true })
+      Animated.timing(fadeAnim, { toValue: 0, duration: 220, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 220, useNativeDriver: Platform.OS !== 'web' })
     ]).start(() => setMode(newMode));
     setTimeout(() => setMode(newMode), 220); // Pour le switch réel après fade out
   };

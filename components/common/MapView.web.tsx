@@ -3,10 +3,10 @@ import React, { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useLocation } from "../../hooks/useLocation";
+// Style dark open source CartoBasemap, compatible MapLibre, sans clé ni sprite
+const OSM_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
 
-const OSM_STYLE = "https://tiles.stadiamaps.com/styles/alidade_smooth_dark.json"; // Style sombre, minimaliste, open source
-
-export default function MapView() {
+export default function MapView({ color = "#A259FF" }: { color?: string }) {
   const { location } = useLocation();
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -56,7 +56,7 @@ export default function MapView() {
         el.style.display = 'flex';
         el.style.alignItems = 'center';
         el.style.justifyContent = 'center';
-        el.innerHTML = `<svg width="28" height="28" style="transform:rotate(${location?.coords?.heading ?? 0}deg)" viewBox="0 0 24 24" fill="none" stroke="#A259FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 19 21 12 17 5 21 12 2"/></svg>`;
+        el.innerHTML = `<svg width="28" height="28" style="transform:rotate(${location?.coords?.heading ?? 0}deg)" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 19 21 12 17 5 21 12 2"/></svg>`;
         marker = new maplibregl.Marker({ element: el })
           .setLngLat([lon, lat])
           .addTo(mapRef.current);
@@ -65,22 +65,25 @@ export default function MapView() {
         marker.setLngLat([lon, lat]);
         // Update heading
         const el = marker.getElement();
-        el.innerHTML = `<svg width="28" height="28" style="transform:rotate(${location?.coords?.heading ?? 0}deg)" viewBox="0 0 24 24" fill="none" stroke="#A259FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 19 21 12 17 5 21 12 2"/></svg>`;
+        el.innerHTML = `<svg width="28" height="28" style="transform:rotate(${location?.coords?.heading ?? 0}deg)" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 19 21 12 17 5 21 12 2"/></svg>`;
+        // Toujours réajouter le marker si jamais il a été détaché
+        if (!(marker as any)._map) {
+          marker.addTo(mapRef.current);
+        }
       }
     }
-  }, [lat, lon, location?.coords?.heading]);
+  }, [lat, lon, location?.coords?.heading, mapRef.current, color]);
+
+  useEffect(() => {
+    const recenterListener = () => handleRecenter();
+    window.addEventListener('recenter-map', recenterListener);
+    return () => window.removeEventListener('recenter-map', recenterListener);
+  }, [lat, lon, location?.coords]);
 
   return (
     <div style={{ width: "100%", height: "100%", minHeight: 300, borderTopLeftRadius: 32, borderTopRightRadius: 32, overflow: "hidden", position: 'relative' }}>
       <div ref={mapContainer} style={{ width: "100%", height: "100%" }} />
-      {/* Bouton recentrer */}
-      <button
-        onClick={handleRecenter}
-        style={{ position: 'absolute', bottom: 24, right: 18, zIndex: 10, background: '#23242A', borderRadius: 24, padding: 8, border: 'none', boxShadow: '0 2px 8px #0003', cursor: 'pointer' }}
-        aria-label="Recentrer"
-      >
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#A259FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
-      </button>
+      {/* Bouton recentrer intégré supprimé, seul le bouton custom parent reste */}
     </div>
   );
 }
