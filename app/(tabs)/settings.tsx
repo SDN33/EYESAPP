@@ -10,7 +10,6 @@ export default function SettingsScreen() {
   const { user, login, logout } = useAuth();
   const { isPremium, upgrade } = usePremium();
   const { hasConsent, acceptConsent } = useConsent();
-  const [mode, setMode] = useState<"moto" | "voiture">("moto");
   // TODO: lire ce mode depuis profil user/storage si besoin
 
   const colorScheme = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
