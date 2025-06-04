@@ -21,19 +21,9 @@ export default function CustomMapView({ color = "#A259FF" }: { color?: string })
   const lon = location?.coords?.longitude ?? 2.2945;
   const mapRef = useRef<MapView>(null);
   const markerRef = useRef<any>(null);
-  // Utilisation d'AnimatedRegion pour la position du marker
-  const animatedCoordinate = useRef(
-    new AnimatedRegion({ latitude: lat, longitude: lon })
-  ).current;
+  // Suppression d'AnimatedRegion : on utilise la position simple pour la compatibilité et la robustesse Expo
 
   useEffect(() => {
-    if (location?.coords) {
-      animatedCoordinate.timing({
-        toValue: { latitude: lat, longitude: lon },
-        duration: 500,
-        useNativeDriver: false,
-      }).start();
-    }
     if (location?.coords && mapRef.current) {
       mapRef.current.animateToRegion({
         latitude: lat,
@@ -69,10 +59,7 @@ export default function CustomMapView({ color = "#A259FF" }: { color?: string })
         {location?.coords && (
           <Marker.Animated
             ref={markerRef}
-            coordinate={{
-              latitude: animatedCoordinate.latitude.__getValue(),
-              longitude: animatedCoordinate.longitude.__getValue(),
-            }}
+            coordinate={{ latitude: lat, longitude: lon }}
             anchor={{ x: 0.5, y: 0.5 }}
             flat
           >
