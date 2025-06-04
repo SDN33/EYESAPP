@@ -6,6 +6,8 @@ import { useLeanAngle } from "../../hooks/useLeanAngle";
 import ConsentModal from "../../components/common/ConsentModal";
 import { useConsent } from "../../hooks/useConsent";
 import MapView from "./MapView";
+// If you want to use react-native-maps, use:
+// import MapView, { Marker } from "react-native-maps";
 import { Ionicons } from '@expo/vector-icons';
 import { getAddressFromCoords, getSpeedLimitFromCoords } from "../../utils/roadInfo";
 import { IconSymbol } from "../ui/IconSymbol";
@@ -18,6 +20,13 @@ export default function ExploreMotoScreen() {
   const speed = location?.coords?.speed ? Math.max(0, Math.round(location.coords.speed * 3.6)) : 0;
   const [speedLimit, setSpeedLimit] = useState<number|null>(null);
   const [address, setAddress] = useState<string>("");
+  const [mapRegion, setMapRegion] = useState({
+    latitude: location?.coords?.latitude || 44.7586,
+    longitude: location?.coords?.longitude || -0.4182,
+    latitudeDelta: 0.01,
+    longitudeDelta: 0.01,
+  });
+  const [recenterKey, setRecenterKey] = useState(0);
 
   // Animation compteur (aiguille)
   const animatedSpeed = useSharedValue(speed);
@@ -44,6 +53,17 @@ export default function ExploreMotoScreen() {
         .catch(() => setSpeedLimit(null));
     }
   }, [location?.coords]);
+
+  useEffect(() => {
+    if (location?.coords) {
+      setMapRegion(region => ({
+        ...region,
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      }));
+    }
+  }, [location?.coords]);
+
   // Calcul sécurisé du dépassement de la limite
   const isOverLimit = typeof speedLimit === 'number' && !isNaN(speedLimit) && speed > speedLimit;
 
@@ -165,18 +185,23 @@ export default function ExploreMotoScreen() {
           </View>
         ) : null}
       </View>
-      {/* Bas : Carte GPS (50%) */}
+      {/* Bas : Carte GPS immersive (plein écran sous le header) */}
       <View style={{ flex: 1, overflow: "hidden", borderTopLeftRadius: 32, borderTopRightRadius: 32 }}>
-        <MapView color="#A259FF" />
-        {/* Bouton recentrer en haut à droite, décalé à gauche, et fonctionnel (envoie un event custom) */}
+        <MapView
+          key={recenterKey}
+          color="#A259FF"
+        />
+        {/* Bouton recentrer cross-platform */}
         <View style={{ position: 'absolute', top: 18, right: 64, zIndex: 20 }}>
           <View style={{ backgroundColor: '#23242A', borderRadius: 24, padding: 8, shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 6 }}>
-            <Ionicons name="locate" size={28} color="#A259FF" onPress={() => {window.dispatchEvent(new CustomEvent('recenter-map'));}} />
+            <Ionicons name="locate" size={28} color="#A259FF" onPress={() => {
+              setRecenterKey(k => k + 1);
+            }} />
           </View>
         </View>
         {/* Bouton flottant signalement, discret en haut à gauche */}
         <TouchableOpacity
-          style={{ position: 'absolute', top: 18, left: 18, backgroundColor: '#23242A', borderRadius: 18, padding: 8, shadowColor: '#000', shadowOpacity: 0.10, shadowRadius: 4, zIndex: 30, opacity: 0.85 }}
+          style={{ position: 'absolute', top: 58, left: 18, backgroundColor: '#23242A', borderRadius: 18, padding: 8, shadowColor: '#000', shadowOpacity: 0.10, shadowRadius: 4, zIndex: 30, opacity: 0.85 }}
           onPress={() => setShowAlertModal(true)}
         >
           <Ionicons name="alert" size={20} color="#A259FF" />

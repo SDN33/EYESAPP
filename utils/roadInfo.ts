@@ -1,5 +1,7 @@
 // utils/roadInfo.ts
 
+import Constants from 'expo-constants';
+
 // API gratuite pour l'adresse : Nominatim (OpenStreetMap)
 export async function getAddressFromCoords(lat: number, lon: number) {
   let url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`;
@@ -24,31 +26,42 @@ export async function getAddressFromCoords(lat: number, lon: number) {
   }
 }
 
-// API gratuite pour la limitation de vitesse : Overpass (OpenStreetMap)
+// Récupère la clé API Google depuis .env (Expo ou Node)
+const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || (Constants?.expoConfig?.extra?.GOOGLE_API_KEY) || 'INSERER_VOTRE_CLE_API_ICI';
+
+// API Google Roads pour la limitation de vitesse
+const speedLimitCache: Record<string, { value: string | null, ts: number }> = {};
+
 export async function getSpeedLimitFromCoords(lat: number, lon: number) {
-  const query = `
-    [out:json];
-    way(around:20,${lat},${lon})["highway"]["maxspeed"];
-    out tags center 1;
-  `;
-  const url = "https://overpass-api.de/api/interpreter";
+  const key = `${lat.toFixed(4)},${lon.toFixed(4)}`;
+  if (speedLimitCache[key] && Date.now() - speedLimitCache[key].ts < 10 * 60 * 1000) {
+    return speedLimitCache[key].value;
+  }
+  // Google Roads API : nearestRoads puis speedLimits
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
-    const res = await fetch(url, {
-      method: "POST",
-      body: query,
-      headers: { "Content-Type": "text/plain" },
-      signal: controller.signal
-    });
-    clearTimeout(timeout);
-    if (!res.ok) throw new Error('Erreur Overpass');
-    const data = await res.json();
-    if (data.elements && data.elements.length > 0) {
-      return data.elements[0].tags.maxspeed;
+    // 1. Trouver le point sur la route le plus proche
+    const nearestUrl = `https://roads.googleapis.com/v1/nearestRoads?points=${lat},${lon}&key=${GOOGLE_API_KEY}`;
+    const nearestRes = await fetch(nearestUrl);
+    if (!nearestRes.ok) throw new Error('Erreur Google Roads nearestRoads');
+    const nearestData = await nearestRes.json();
+    if (!nearestData.snappedPoints || nearestData.snappedPoints.length === 0) {
+      speedLimitCache[key] = { value: null, ts: Date.now() };
+      return null;
     }
-    return null;
+    const placeId = nearestData.snappedPoints[0].placeId;
+    // 2. Récupérer la limitation de vitesse
+    const speedUrl = `https://roads.googleapis.com/v1/speedLimits?placeId=${placeId}&key=${GOOGLE_API_KEY}`;
+    const speedRes = await fetch(speedUrl);
+    if (!speedRes.ok) throw new Error('Erreur Google Roads speedLimits');
+    const speedData = await speedRes.json();
+    let value = null;
+    if (speedData.speedLimits && speedData.speedLimits.length > 0) {
+      value = speedData.speedLimits[0].speedLimit;
+    }
+    speedLimitCache[key] = { value, ts: Date.now() };
+    return value;
   } catch {
+    if (speedLimitCache[key]) return speedLimitCache[key].value;
     return null;
   }
 }

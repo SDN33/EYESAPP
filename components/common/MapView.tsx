@@ -18,11 +18,23 @@ const DARK_MAP_STYLE = [
 
 export default function CustomMapView({ color = "#A259FF" }: { color?: string }) {
   const { location } = useLocation();
-  const lat = location?.coords?.latitude ?? 48.8584;
-  const lon = location?.coords?.longitude ?? 2.2945;
+  const lat = location?.coords?.latitude;
+  const lon = location?.coords?.longitude;
   const mapRef = useRef<MapView>(null);
   const markerRef = useRef<any>(null);
   const compassHeading = useHeading();
+
+  // Recentrage sur la position GPS réelle au montage (key change)
+  useEffect(() => {
+    if (mapRef.current && lat && lon) {
+      mapRef.current.animateCamera({
+        center: { latitude: lat, longitude: lon },
+        zoom: 17,
+        pitch: 65,
+        heading: location?.coords?.heading || 0,
+      }, { duration: 500 });
+    }
+  }, [lat, lon]);
 
   useEffect(() => {
     if (location?.coords && mapRef.current) {
@@ -37,8 +49,8 @@ export default function CustomMapView({ color = "#A259FF" }: { color?: string })
       const rad = (heading - 90) * Math.PI / 180;
       const dLat = Math.cos(rad) * offsetLat;
       const dLon = Math.sin(rad) * offsetLat;
-      const centerLat = lat + dLat;
-      const centerLon = lon + dLon;
+      const centerLat = lat ? lat + dLat : 48.8584;
+      const centerLon = lon ? lon + dLon : 2.2945;
       let zoom = 17 - (speed / 60);
       if (zoom < 15) zoom = 15;
       if (zoom > 17) zoom = 17;
@@ -58,8 +70,8 @@ export default function CustomMapView({ color = "#A259FF" }: { color?: string })
         provider={PROVIDER_GOOGLE}
         style={{ flex: 1, borderRadius: 24, overflow: 'hidden' }}
         initialRegion={{
-          latitude: lat,
-          longitude: lon,
+          latitude: lat || 48.8584,
+          longitude: lon || 2.2945,
           latitudeDelta: 0.01,
           longitudeDelta: 0.01,
         }}
@@ -73,7 +85,7 @@ export default function CustomMapView({ color = "#A259FF" }: { color?: string })
         minZoomLevel={10}
         maxZoomLevel={19}
       >
-        {location?.coords && (
+        {lat && lon && (
           <Marker.Animated
             ref={markerRef}
             coordinate={{ latitude: lat, longitude: lon }}

@@ -41,8 +41,8 @@
     "extra": {
       "SANITY_TOKEN": "tsk48F2E1nCXMpf0fxxjbl3mh3PaIKloCv4yfEDIURDGyxUBtaXvqwra9ykK6NPqHTyiWnIrA3y8uZ97bG9Z2rUmdtWDpMwMyKMN1eQ2AclXdkVqsH7g1c3QYLqL7YG6c3WdXNae9htc7O8GYaJvGDSpbiNjOGz00iy3hFsjrM9y3tjX288ba",
       "SANITY_PROJECT_ID": "o23wpsz2",
-      "SANITY_DATASET": "production"
-
+      "SANITY_DATASET": "production",
+      "GOOGLE_API_KEY": "AIzaSyBmVBiIzMDvK9U6Xf3mHCo33KGLXeC8FK0"
     }
   }
 }

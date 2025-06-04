@@ -23,6 +23,7 @@ export default function ExploreVoitureScreen() {
   // Mock d'alertes communautaires (à remplacer par backend plus tard)
   const [alerts, setAlerts] = useState([]); // plus d'alertes sur la carte
   const [showAlertModal, setShowAlertModal] = useState(false);
+  const [recenterKey, setRecenterKey] = useState(0);
 
   const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
   const isSmallScreen = screenWidth < 370 || screenHeight < 700;
@@ -185,11 +186,16 @@ export default function ExploreVoitureScreen() {
       </View>
       {/* Bas : Carte GPS (50%) */}
       <View style={{ flex: 1, overflow: "hidden", borderTopLeftRadius: 32, borderTopRightRadius: 32 }}>
-        <MapView color="#60A5FA" />
-        {/* Bouton recentrer en haut à droite, décalé à gauche, et fonctionnel (envoie un event custom) */}
+        <MapView
+          key={recenterKey}
+          color="#2979FF"
+        />
+        {/* Bouton recentrer cross-platform */}
         <View style={{ position: 'absolute', top: 18, right: 64, zIndex: 20 }}>
           <View style={{ backgroundColor: '#23242A', borderRadius: 24, padding: 8, shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 6 }}>
-            <Ionicons name="locate" size={28} color="#60A5FA" onPress={() => {window.dispatchEvent(new CustomEvent('recenter-map'));}} />
+            <Ionicons name="locate" size={28} color="#2979FF" onPress={() => {
+              setRecenterKey(k => k + 1);
+            }} />
           </View>
         </View>
         {/* Bouton flottant signalement, discret en haut à gauche */}
