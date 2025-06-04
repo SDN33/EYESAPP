@@ -4,12 +4,35 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useLocation } from "../../hooks/useLocation";
 // Style dark open source CartoBasemap, compatible MapLibre, sans clé ni sprite
-const OSM_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
+import type { StyleSpecification } from "maplibre-gl";
+
+const DARK_STYLE: StyleSpecification = {
+  version: 8,
+  name: "Dark Minimal (No Sprite)",
+  sources: {
+    osm: {
+      type: "raster",
+      tiles: [
+        "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        "https://b.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        "https://c.tile.openstreetmap.org/{z}/{x}/{y}.png"
+      ],
+      tileSize: 256,
+      attribution: "© OpenStreetMap contributors"
+    }
+  },
+  glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+  layers: [
+    { id: "background", type: "background", paint: { "background-color": "#181A20" } },
+    { id: "osm-tiles", type: "raster", source: "osm", minzoom: 0, maxzoom: 19 }
+  ]
+};
 
 export default function MapView({ color = "#A259FF" }: { color?: string }) {
   const { location } = useLocation();
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
+  const markerRef = useRef<maplibregl.Marker | null>(null);
   const [centered, setCentered] = useState(true);
   const lat = location?.coords?.latitude ?? 48.8584;
   const lon = location?.coords?.longitude ?? 2.2945;
@@ -18,8 +41,7 @@ export default function MapView({ color = "#A259FF" }: { color?: string }) {
   const handleRecenter = () => {
     setCentered(true);
     if (mapRef.current && location?.coords) {
-      mapRef.current.setCenter([lon, lat]);
-      mapRef.current.setZoom(16);
+      mapRef.current.flyTo({ center: [lon, lat], zoom: 16, speed: 1.2 });
     }
   };
 
@@ -27,52 +49,89 @@ export default function MapView({ color = "#A259FF" }: { color?: string }) {
     if (!mapRef.current && mapContainer.current) {
       mapRef.current = new maplibregl.Map({
         container: mapContainer.current,
-        style: OSM_STYLE,
+        style: DARK_STYLE,
         center: [lon, lat],
         zoom: 16,
         attributionControl: false,
+        minZoom: 10,
+        maxZoom: 19,
       });
       mapRef.current.addControl(new maplibregl.NavigationControl(), 'top-right');
       mapRef.current.on('dragstart', () => setCentered(false));
       mapRef.current.on('zoomstart', () => setCentered(false));
     }
     if (mapRef.current && location?.coords && centered) {
-      mapRef.current.setCenter([lon, lat]);
+      mapRef.current.flyTo({ center: [lon, lat], zoom: 16, speed: 1.2 });
     }
+    // Cleanup: remove marker first, then map
     return () => {
-      mapRef.current?.remove();
-      mapRef.current = null;
+      if (markerRef.current) {
+        markerRef.current.remove();
+        markerRef.current = null;
+      }
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
     };
   }, [lat, lon, centered]);
 
   useEffect(() => {
-    if (mapRef.current && location?.coords) {
-      // Ajout ou update du marker
-      let marker = (mapRef.current as any)._userMarker;
-      if (!marker) {
-        const el = document.createElement('div');
-        el.style.width = '32px';
-        el.style.height = '32px';
-        el.style.display = 'flex';
-        el.style.alignItems = 'center';
-        el.style.justifyContent = 'center';
-        el.innerHTML = `<svg width="28" height="28" style="transform:rotate(${location?.coords?.heading ?? 0}deg)" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 19 21 12 17 5 21 12 2"/></svg>`;
-        marker = new maplibregl.Marker({ element: el })
-          .setLngLat([lon, lat])
-          .addTo(mapRef.current);
-        (mapRef.current as any)._userMarker = marker;
-      } else {
-        marker.setLngLat([lon, lat]);
-        // Update heading
-        const el = marker.getElement();
-        el.innerHTML = `<svg width="28" height="28" style="transform:rotate(${location?.coords?.heading ?? 0}deg)" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 19 21 12 17 5 21 12 2"/></svg>`;
-        // Toujours réajouter le marker si jamais il a été détaché
-        if (!(marker as any)._map) {
-          marker.addTo(mapRef.current);
+    // Nettoyage robuste du marker à chaque update ou unmount
+    return () => {
+      if (markerRef.current) {
+        try {
+          markerRef.current.remove();
+        } catch (e) {
+          // Ignore si déjà supprimé
         }
+        markerRef.current = null;
       }
+    };
+  }, [lat, lon, location?.coords?.heading, color]);
+
+  useEffect(() => {
+    if (!mapRef.current || !location?.coords) return;
+    // Ajout ou update du marker animé
+    if (!markerRef.current) {
+      const el = document.createElement('div');
+      el.style.width = '36px';
+      el.style.height = '36px';
+      el.style.display = 'flex';
+      el.style.alignItems = 'center';
+      el.style.justifyContent = 'center';
+      el.style.background = 'rgba(30,30,40,0.95)';
+      el.style.borderRadius = '50%';
+      // Couleur du marker selon le mode
+      const markerColor = color === '#A259FF' ? '#A259FF' : '#2979FF';
+      const markerShadow = color === '#A259FF' ? '#A259FF99' : '#2979FF99';
+      el.style.boxShadow = `0 2px 12px ${markerShadow}, 0 0 0 4px #23242A`;
+      el.style.border = `2px solid ${markerColor}`;
+      el.innerHTML = `
+        <svg width="28" height="28" style="transform:rotate(${location?.coords?.heading ?? 0}deg)" viewBox="0 0 24 24" fill="${markerColor}" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="12 2 19 21 12 17 5 21 12 2"/>
+        </svg>
+      `;
+      markerRef.current = new maplibregl.Marker({ element: el })
+        .setLngLat([lon, lat])
+        .addTo(mapRef.current);
+    } else {
+      markerRef.current.setLngLat([lon, lat]);
+      // Update heading et couleur
+      const markerColor = color === '#A259FF' ? '#A259FF' : '#2979FF';
+      const markerShadow = color === '#A259FF' ? '#A259FF99' : '#2979FF99';
+      const el = markerRef.current.getElement();
+      el.innerHTML = `
+        <svg width="28" height="28" style="transform:rotate(${location?.coords?.heading ?? 0}deg)" viewBox="0 0 24 24" fill="${markerColor}" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="12 2 19 21 12 17 5 21 12 2"/>
+        </svg>
+      `;
+      el.style.background = 'rgba(30,30,40,0.95)';
+      el.style.borderRadius = '50%';
+      el.style.boxShadow = `0 2px 12px ${markerShadow}, 0 0 0 4px #23242A`;
+      el.style.border = `2px solid ${markerColor}`;
     }
-  }, [lat, lon, location?.coords?.heading, mapRef.current, color]);
+  }, [lat, lon, location?.coords?.heading, color]);
 
   useEffect(() => {
     const recenterListener = () => handleRecenter();
@@ -83,7 +142,6 @@ export default function MapView({ color = "#A259FF" }: { color?: string }) {
   return (
     <div style={{ width: "100%", height: "100%", minHeight: 300, borderTopLeftRadius: 32, borderTopRightRadius: 32, overflow: "hidden", position: 'relative' }}>
       <div ref={mapContainer} style={{ width: "100%", height: "100%" }} />
-      {/* Bouton recentrer intégré supprimé, seul le bouton custom parent reste */}
     </div>
   );
 }

@@ -1,55 +1,111 @@
 // MapView.tsx : version mobile (Expo/React Native)
-import React, { useEffect, useRef, useState } from "react";
-import MapboxGL from "@rnmapbox/maps";
+import React, { useEffect, useRef } from "react";
 import { View, Platform, Animated } from "react-native";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useLocation } from "../../hooks/useLocation";
-import { Ionicons } from "@expo/vector-icons";
+import MapView, { Marker, PROVIDER_GOOGLE, AnimatedRegion } from 'react-native-maps';
 
-MapboxGL.setAccessToken(""); // Pas besoin de token pour les styles libres OSM/MapTiler
+const DARK_MAP_STYLE = [
+  { elementType: 'geometry', stylers: [{ color: '#181B2C' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#181B2C' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#A259FF' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#23242A' }] },
+  { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#888' }] },
+  { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#23242A' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#181A20' }] },
+  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+];
 
-// Style OSM dark compatible mobile/web, sans sprite, public
-const OSM_STYLE = "https://demotiles.maplibre.org/style.json";
-
-export default function MapView({ color = "#A259FF" }: { color?: string }) {
+export default function CustomMapView({ color = "#A259FF" }: { color?: string }) {
   const { location } = useLocation();
-  const mapRef = useRef(null);
-  const [centered, setCentered] = useState(true);
   const lat = location?.coords?.latitude ?? 48.8584;
   const lon = location?.coords?.longitude ?? 2.2945;
+  const mapRef = useRef<MapView>(null);
+  const markerRef = useRef<any>(null);
+  // Utilisation d'AnimatedRegion pour la position du marker
+  const animatedCoordinate = useRef(
+    new AnimatedRegion({ latitude: lat, longitude: lon })
+  ).current;
 
-  // Toujours afficher le marker, même si la carte n'est pas centrée
-  // (le marker dépend uniquement de location?.coords)
+  useEffect(() => {
+    if (location?.coords) {
+      animatedCoordinate.timing({
+        toValue: { latitude: lat, longitude: lon },
+        duration: 500,
+        useNativeDriver: false,
+      }).start();
+    }
+    if (location?.coords && mapRef.current) {
+      mapRef.current.animateToRegion({
+        latitude: lat,
+        longitude: lon,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      }, 500);
+    }
+  }, [lat, lon]);
+
   return (
     <View style={{ flex: 1 }}>
-      <MapboxGL.MapView
+      <MapView
         ref={mapRef}
-        style={{ flex: 1 }}
-        styleURL={OSM_STYLE}
-        logoEnabled={false}
-        compassEnabled={true}
-        rotateEnabled={true}
-        pitchEnabled={true}
-        zoomEnabled={true}
-        attributionEnabled={false}
-        onRegionWillChange={() => setCentered(false)}
+        provider={PROVIDER_GOOGLE}
+        style={{ flex: 1, borderRadius: 24, overflow: 'hidden' }}
+        initialRegion={{
+          latitude: lat,
+          longitude: lon,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        }}
+        customMapStyle={DARK_MAP_STYLE}
+        showsUserLocation={true}
+        followsUserLocation={true}
+        showsMyLocationButton={true}
+        showsCompass={true}
+        showsBuildings={false}
+        toolbarEnabled={false}
+        minZoomLevel={10}
+        maxZoomLevel={19}
       >
-        <MapboxGL.Camera
-          centerCoordinate={centered ? [lon, lat] : undefined}
-          zoomLevel={16}
-          animationMode="flyTo"
-          animationDuration={800}
-        />
-        {/* Marker toujours visible, couleur dynamique */}
         {location?.coords && (
-          <MapboxGL.PointAnnotation id="me" coordinate={[lon, lat]}>
-            <View style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name="navigate" size={28} color={color} style={{ transform: [{ rotate: `${location?.coords?.heading ?? 0}deg` }] }} />
-              <View style={{ position: 'absolute', width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: '#fff', opacity: 0.7 }} />
+          <Marker.Animated
+            ref={markerRef}
+            coordinate={{
+              latitude: animatedCoordinate.latitude.__getValue(),
+              longitude: animatedCoordinate.longitude.__getValue(),
+            }}
+            anchor={{ x: 0.5, y: 0.5 }}
+            flat
+          >
+            {/* Marker custom bleu ou violet selon le mode, identique web/mobile */}
+            <View style={{
+              width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(30,30,40,0.95)',
+              alignItems: 'center', justifyContent: 'center',
+              borderWidth: 2, borderColor: color === '#A259FF' ? '#A259FF' : '#2979FF',
+              shadowColor: color === '#A259FF' ? '#A259FF' : '#2979FF', shadowOpacity: 0.6, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
+              elevation: 8,
+            }}>
+              <View style={{
+                width: 28, height: 28, transform: [{ rotate: `${location?.coords?.heading ?? 0}deg` }],
+                alignItems: 'center', justifyContent: 'center',
+              }}>
+                {/* Triangle bleu ou violet façon web, version RN */}
+                <View style={{
+                  width: 0, height: 0,
+                  borderLeftWidth: 14, borderRightWidth: 14,
+                  borderBottomWidth: 24, borderLeftColor: 'transparent', borderRightColor: 'transparent',
+                  borderBottomColor: color === '#A259FF' ? '#A259FF' : '#2979FF',
+                  borderTopWidth: 0, borderTopColor: 'transparent',
+                }} />
+                {/* Contour blanc */}
+                <View style={{
+                  position: 'absolute', top: 0, left: 0, width: 28, height: 28,
+                  borderRadius: 14, borderWidth: 2.5, borderColor: '#fff',
+                }} />
+              </View>
             </View>
-          </MapboxGL.PointAnnotation>
+          </Marker.Animated>
         )}
-      </MapboxGL.MapView>
+      </MapView>
     </View>
   );
 }
