@@ -25,14 +25,30 @@ export default function CustomMapView({ color = "#A259FF" }: { color?: string })
 
   useEffect(() => {
     if (location?.coords && mapRef.current) {
-      mapRef.current.animateToRegion({
-        latitude: lat,
-        longitude: lon,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      }, 500);
+      // Offset vertical en latitude pour voir devant (mode conduite)
+      const { height } = require('react-native').Dimensions.get('window');
+      const offsetPx = 200; // plus loin devant
+      const latitudeDelta = 0.01;
+      const offsetLat = (offsetPx / height) * latitudeDelta;
+      const heading = location?.coords?.heading ?? 0;
+      const rad = (heading - 90) * Math.PI / 180;
+      const dLat = Math.cos(rad) * offsetLat;
+      const dLon = Math.sin(rad) * offsetLat;
+      const centerLat = lat + dLat;
+      const centerLon = lon + dLon;
+      // Zoom dynamique selon la vitesse
+      const speed = location?.coords?.speed || 0;
+      let zoom = 17 - (speed / 60);
+      if (zoom < 15) zoom = 15;
+      if (zoom > 17) zoom = 17;
+      mapRef.current.animateCamera({
+        center: { latitude: centerLat, longitude: centerLon },
+        heading,
+        pitch: 65, // Effet 3D plus marqué
+        zoom,
+      }, { duration: 500 });
     }
-  }, [lat, lon]);
+  }, [lat, lon, location?.coords?.heading, location?.coords?.speed]);
 
   return (
     <View style={{ flex: 1 }}>

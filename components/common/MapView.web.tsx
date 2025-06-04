@@ -52,6 +52,7 @@ export default function MapView({ color = "#A259FF" }: { color?: string }) {
         style: DARK_STYLE,
         center: [lon, lat],
         zoom: 16,
+        bearing: location?.coords?.heading ?? 0, // Ajout du cap initial
         attributionControl: false,
         minZoom: 10,
         maxZoom: 19,
@@ -61,7 +62,24 @@ export default function MapView({ color = "#A259FF" }: { color?: string }) {
       mapRef.current.on('zoomstart', () => setCentered(false));
     }
     if (mapRef.current && location?.coords && centered) {
-      mapRef.current.flyTo({ center: [lon, lat], zoom: 16, speed: 1.2 });
+      // Mode conduite : recentre avec offset vertical et rotation selon heading, zoom dynamique
+      const offset = 200; // px, plus loin devant
+      const center = mapRef.current.project([lon, lat]);
+      center.y += offset;
+      const newCenter = mapRef.current.unproject(center);
+      // Zoom dynamique selon la vitesse (plus rapide = plus loin)
+      const speed = location?.coords?.speed || 0;
+      let zoom = 17 - (speed / 60);
+      if (zoom < 15) zoom = 15;
+      if (zoom > 17) zoom = 17;
+      mapRef.current.flyTo({
+        center: [newCenter.lng, newCenter.lat],
+        zoom,
+        bearing: location?.coords?.heading ?? 0,
+        pitch: 65, // Effet 3D plus marqué
+        speed: 1.2,
+        essential: true
+      });
     }
     // Cleanup: remove marker first, then map
     return () => {
@@ -74,7 +92,7 @@ export default function MapView({ color = "#A259FF" }: { color?: string }) {
         mapRef.current = null;
       }
     };
-  }, [lat, lon, centered]);
+  }, [lat, lon, centered, location?.coords?.heading]);
 
   useEffect(() => {
     // Nettoyage robuste du marker à chaque update ou unmount
