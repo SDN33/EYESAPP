@@ -2,6 +2,7 @@
 import React, { useEffect, useRef } from "react";
 import { View, Platform, Animated } from "react-native";
 import { useLocation } from "../../hooks/useLocation";
+import { useHeading } from "../../hooks/useHeading";
 import MapView, { Marker, PROVIDER_GOOGLE, AnimatedRegion } from 'react-native-maps';
 
 const DARK_MAP_STYLE = [
@@ -21,34 +22,34 @@ export default function CustomMapView({ color = "#A259FF" }: { color?: string })
   const lon = location?.coords?.longitude ?? 2.2945;
   const mapRef = useRef<MapView>(null);
   const markerRef = useRef<any>(null);
-  // Suppression d'AnimatedRegion : on utilise la position simple pour la compatibilité et la robustesse Expo
+  const compassHeading = useHeading();
 
   useEffect(() => {
     if (location?.coords && mapRef.current) {
-      // Offset vertical en latitude pour voir devant (mode conduite)
       const { height } = require('react-native').Dimensions.get('window');
-      const offsetPx = 200; // plus loin devant
+      const offsetPx = 200;
       const latitudeDelta = 0.01;
       const offsetLat = (offsetPx / height) * latitudeDelta;
-      const heading = location?.coords?.heading ?? 0;
+      // Choix du heading : GPS si vitesse > 2 km/h, sinon boussole
+      const speed = location?.coords?.speed || 0;
+      let heading = location?.coords?.heading;
+      if (!heading || speed * 3.6 < 2) heading = compassHeading ?? 0;
       const rad = (heading - 90) * Math.PI / 180;
       const dLat = Math.cos(rad) * offsetLat;
       const dLon = Math.sin(rad) * offsetLat;
       const centerLat = lat + dLat;
       const centerLon = lon + dLon;
-      // Zoom dynamique selon la vitesse
-      const speed = location?.coords?.speed || 0;
       let zoom = 17 - (speed / 60);
       if (zoom < 15) zoom = 15;
       if (zoom > 17) zoom = 17;
       mapRef.current.animateCamera({
         center: { latitude: centerLat, longitude: centerLon },
         heading,
-        pitch: 65, // Effet 3D plus marqué
+        pitch: 65,
         zoom,
       }, { duration: 500 });
     }
-  }, [lat, lon, location?.coords?.heading, location?.coords?.speed]);
+  }, [lat, lon, location?.coords?.heading, location?.coords?.speed, compassHeading]);
 
   return (
     <View style={{ flex: 1 }}>
