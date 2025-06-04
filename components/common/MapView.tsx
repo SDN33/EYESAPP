@@ -1,95 +1,73 @@
+// MapView.tsx : version mobile (Expo/React Native)
 import React, { useEffect, useRef, useState } from "react";
-import {
-  default as RNMapView,
-  PROVIDER_GOOGLE,
-  Marker,
-} from "react-native-maps";
-import { useLocation } from "../../hooks/useLocation";
-import { Animated } from "react-native";
+import MapboxGL from "@rnmapbox/maps";
+import { View, Platform, Animated } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useLocation } from "../../hooks/useLocation";
+import { Ionicons } from "@expo/vector-icons";
 
-export { PROVIDER_GOOGLE };
+MapboxGL.setAccessToken(""); // Pas besoin de token pour les styles libres OSM/MapTiler
 
-export default function MapView(props: any) {
+const OSM_STYLE = "https://tiles.stadiamaps.com/styles/alidade_smooth_dark.json"; // Style sombre, minimaliste, open source
+
+export default function MapView() {
   const { location } = useLocation();
+  const mapRef = useRef(null);
+  const [centered, setCentered] = useState(true);
   const lat = location?.coords?.latitude ?? 48.8584;
   const lon = location?.coords?.longitude ?? 2.2945;
 
-  // Pour animer le déplacement du marker et de la caméra
-  const [region, setRegion] = useState({
-    latitude: lat,
-    longitude: lon,
-    latitudeDelta: 0.01,
-    longitudeDelta: 0.01,
-  });
-
+  // Toujours afficher le marker, même si la carte n'est pas centrée
   useEffect(() => {
-    if (location?.coords) {
-      setRegion({
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      });
+    if (centered && mapRef.current && location?.coords) {
+      (mapRef.current as any).setCamera({ centerCoordinate: [lon, lat], zoomLevel: 16, animationDuration: 800 });
     }
-  }, [location]);
+  }, [lat, lon, centered]);
+
+  // Bouton recentrer
+  const handleRecenter = () => {
+    setCentered(true);
+    if (mapRef.current && location?.coords) {
+      (mapRef.current as any).setCamera({ centerCoordinate: [lon, lat], zoomLevel: 16, animationDuration: 800 });
+    }
+  };
 
   return (
-    <RNMapView
-      {...props}
-      provider={PROVIDER_GOOGLE}
-      style={props.style}
-      initialRegion={region}
-      region={region}
-      showsUserLocation={false}
-      followsUserLocation={false}
-      showsMyLocationButton={true}
-      loadingEnabled={true}
-    >
-      <Marker
-        coordinate={{ latitude: region.latitude, longitude: region.longitude }}
-        anchor={{ x: 0.5, y: 0.5 }}
-        flat
+    <View style={{ flex: 1 }}>
+      <MapboxGL.MapView
+        ref={mapRef}
+        style={{ flex: 1 }}
+        styleURL={OSM_STYLE}
+        logoEnabled={false}
+        compassEnabled={true}
+        rotateEnabled={true}
+        pitchEnabled={true}
+        zoomEnabled={true}
+        attributionEnabled={false}
+        onRegionWillChange={() => setCentered(false)}
       >
-        <AnimatedUserIcon />
-      </Marker>
-    </RNMapView>
-  );
-}
-
-function AnimatedUserIcon() {
-  // Animation de pulsation
-  const scale = useRef(new Animated.Value(1)).current;
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(scale, {
-          toValue: 1.2,
-          duration: 700,
-          useNativeDriver: true,
-        }),
-        Animated.timing(scale, {
-          toValue: 1,
-          duration: 700,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-  }, []);
-  return (
-    <Animated.View style={{ transform: [{ scale }] }}>
-      <MaterialCommunityIcons
-        name="navigation-variant"
-        size={38}
-        color="#10B981"
-        style={{ transform: [{ rotate: "45deg" }] }}
-      />
-      <MaterialCommunityIcons
-        name="circle"
-        size={16}
-        color="#10B98155"
-        style={{ position: "absolute", left: 11, top: 11 }}
-      />
-    </Animated.View>
+        <MapboxGL.Camera
+          centerCoordinate={centered ? [lon, lat] : undefined}
+          zoomLevel={16}
+          animationMode="flyTo"
+          animationDuration={800}
+        />
+        {/* Marker toujours visible */}
+        {location?.coords && (
+          <MapboxGL.PointAnnotation id="me" coordinate={[lon, lat]}>
+            <View style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="navigate" size={28} color="#A259FF" style={{ transform: [{ rotate: `${location?.coords?.heading ?? 0}deg` }] }} />
+              <View style={{ position: 'absolute', width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: '#fff', opacity: 0.7 }} />
+            </View>
+          </MapboxGL.PointAnnotation>
+        )}
+      </MapboxGL.MapView>
+      {/* Bouton recentrer */}
+      <View style={{ position: 'absolute', bottom: 24, right: 18, zIndex: 10 }}>
+        <View style={{ backgroundColor: '#23242A', borderRadius: 24, padding: 8, shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 6 }}>
+          <Ionicons name="locate" size={28} color="#A259FF" onPress={handleRecenter} />
+        </View>
+      </View>
+    </View>
   );
 }

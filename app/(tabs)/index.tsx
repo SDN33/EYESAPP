@@ -7,6 +7,7 @@ import ExploreMotoScreen from "../../components/common/ExploreMotoScreen";
 import ExploreVoitureScreen from "../../components/common/ExploreVoitureScreen";
 import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
+import { IconSymbol } from "../../components/ui/IconSymbol";
 
 export default function ExploreScreen() {
   const { hasConsent, acceptConsent } = useConsent();
@@ -33,9 +34,9 @@ export default function ExploreScreen() {
       <View style={{ position: "absolute", top: 32, right: 24, zIndex: 10, flexDirection: "row", gap: 12 }}>
         <TouchableOpacity
           onPress={() => switchMode("motard")}
-          style={{ opacity: mode === "motard" ? 1 : 0.5, backgroundColor: mode === "motard" ? "#10B98122" : "transparent", borderRadius: 999, padding: 8 }}
+          style={{ opacity: mode === "motard" ? 1 : 0.5, backgroundColor: mode === "motard" ? "#A259FF22" : "transparent", borderRadius: 999, padding: 8 }}
         >
-          <Ionicons name="bicycle" size={28} color={mode === "motard" ? "#10B981" : "#aaa"} />
+          <IconSymbol name="motorcycle" size={28} color={mode === "motard" ? "#A259FF" : "#aaa"} />
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => switchMode("voiture")}

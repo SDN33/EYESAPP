@@ -1,95 +1,86 @@
-import React, { useEffect, useState, useRef } from "react";
-import { View, StyleSheet } from "react-native";
+// MapView.web.tsx : version web (MapLibre GL JS)
+import React, { useEffect, useRef, useState } from "react";
+import maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
+import { useLocation } from "../../hooks/useLocation";
+
+const OSM_STYLE = "https://tiles.stadiamaps.com/styles/alidade_smooth_dark.json"; // Style sombre, minimaliste, open source
 
 export default function MapView() {
-  const [coords, setCoords] = useState<{ lat: number; lon: number; heading?: number } | null>(null);
-  const watchId = useRef<number | null>(null);
+  const { location } = useLocation();
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<maplibregl.Map | null>(null);
+  const [centered, setCentered] = useState(true);
+  const lat = location?.coords?.latitude ?? 48.8584;
+  const lon = location?.coords?.longitude ?? 2.2945;
+
+  // Recentrage
+  const handleRecenter = () => {
+    setCentered(true);
+    if (mapRef.current && location?.coords) {
+      mapRef.current.setCenter([lon, lat]);
+      mapRef.current.setZoom(16);
+    }
+  };
 
   useEffect(() => {
-    if (navigator.geolocation) {
-      watchId.current = navigator.geolocation.watchPosition(
-        (pos) => {
-          setCoords({
-            lat: pos.coords.latitude,
-            lon: pos.coords.longitude,
-            heading: pos.coords.heading ?? undefined,
-          });
-        },
-        () => setCoords(null),
-        { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
-      );
+    if (!mapRef.current && mapContainer.current) {
+      mapRef.current = new maplibregl.Map({
+        container: mapContainer.current,
+        style: OSM_STYLE,
+        center: [lon, lat],
+        zoom: 16,
+        attributionControl: false,
+      });
+      mapRef.current.addControl(new maplibregl.NavigationControl(), 'top-right');
+      mapRef.current.on('dragstart', () => setCentered(false));
+      mapRef.current.on('zoomstart', () => setCentered(false));
+    }
+    if (mapRef.current && location?.coords && centered) {
+      mapRef.current.setCenter([lon, lat]);
     }
     return () => {
-      if (watchId.current !== null && navigator.geolocation.clearWatch) {
-        navigator.geolocation.clearWatch(watchId.current);
-      }
+      mapRef.current?.remove();
+      mapRef.current = null;
     };
-  }, []);
+  }, [lat, lon, centered]);
 
-  // Fallback Paris si pas de géoloc
-  const lat = coords?.lat ?? 48.8584;
-  const lon = coords?.lon ?? 2.2945;
-  const heading = coords?.heading ?? 0;
-  const delta = 0.01;
-  const bbox = `${lon - delta}%2C${lat - delta}%2C${lon + delta}%2C${lat + delta}`;
+  useEffect(() => {
+    if (mapRef.current && location?.coords) {
+      // Ajout ou update du marker
+      let marker = (mapRef.current as any)._userMarker;
+      if (!marker) {
+        const el = document.createElement('div');
+        el.style.width = '32px';
+        el.style.height = '32px';
+        el.style.display = 'flex';
+        el.style.alignItems = 'center';
+        el.style.justifyContent = 'center';
+        el.innerHTML = `<svg width="28" height="28" style="transform:rotate(${location?.coords?.heading ?? 0}deg)" viewBox="0 0 24 24" fill="none" stroke="#A259FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 19 21 12 17 5 21 12 2"/></svg>`;
+        marker = new maplibregl.Marker({ element: el })
+          .setLngLat([lon, lat])
+          .addTo(mapRef.current);
+        (mapRef.current as any)._userMarker = marker;
+      } else {
+        marker.setLngLat([lon, lat]);
+        // Update heading
+        const el = marker.getElement();
+        el.innerHTML = `<svg width="28" height="28" style="transform:rotate(${location?.coords?.heading ?? 0}deg)" viewBox="0 0 24 24" fill="none" stroke="#A259FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 19 21 12 17 5 21 12 2"/></svg>`;
+      }
+    }
+  }, [lat, lon, location?.coords?.heading]);
 
   return (
-    <View style={styles.container}>
-      <div style={{position: 'relative', width: '100%', height: '100%'}}>
-        <iframe
-          title="Carte OpenStreetMap"
-          key={lat + "," + lon}
-          src={`https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik`}
-          style={{
-            border: 0,
-            width: "100%",
-            height: "100%",
-            minHeight: 300,
-            borderTopLeftRadius: 32,
-            borderTopRightRadius: 32,
-            overflow: "hidden",
-            display: 'block',
-            position: 'relative',
-            zIndex: 1,
-          }}
-          allowFullScreen
-        />
-        {/* Marker overlay centré, triangle orienté selon heading */}
-        <svg
-          width={44}
-          height={44}
-          viewBox="0 0 44 44"
-          style={{
-            position: 'absolute',
-            left: '50%',
-            top: '50%',
-            transform: `translate(-50%, -50%) rotate(${heading}deg)`,
-            zIndex: 2,
-            pointerEvents: 'none',
-          }}
-        >
-          <polygon
-            points="22,6 38,38 22,30 6,38"
-            fill="#60A5FA"
-            stroke="#fff"
-            strokeWidth={2}
-            opacity={0.95}
-            style={{ filter: 'drop-shadow(0 2px 6px #0008)' }}
-          />
-        </svg>
-      </div>
-    </View>
+    <div style={{ width: "100%", height: "100%", minHeight: 300, borderTopLeftRadius: 32, borderTopRightRadius: 32, overflow: "hidden", position: 'relative' }}>
+      <div ref={mapContainer} style={{ width: "100%", height: "100%" }} />
+      {/* Bouton recentrer */}
+      <button
+        onClick={handleRecenter}
+        style={{ position: 'absolute', bottom: 24, right: 18, zIndex: 10, background: '#23242A', borderRadius: 24, padding: 8, border: 'none', boxShadow: '0 2px 8px #0003', cursor: 'pointer' }}
+        aria-label="Recentrer"
+      >
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#A259FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
+      </button>
+    </div>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#23242A",
-    alignItems: "center",
-    justifyContent: "center",
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    overflow: "hidden",
-  },
-});
