@@ -16,7 +16,7 @@ export default function PremiumScreen() {
         flex: 1,
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: isDark ? "#111216" : "#fff",
+        backgroundColor: isDark ? "#181B2C" : "#fff",
       }}
     >
       <Text
