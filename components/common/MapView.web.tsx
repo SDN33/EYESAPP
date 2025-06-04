@@ -35,7 +35,23 @@ export default function MapView({ color = "#A259FF" }: { color?: string }) {
         mapTypeId: "roadmap",
         disableDefaultUI: false,
         streetViewControl: false,
-        fullscreenControl: false
+        fullscreenControl: false,
+        styles: [
+          { elementType: 'geometry', stylers: [{ color: '#181A20' }] },
+          { elementType: 'labels.text.stroke', stylers: [{ color: '#181A20' }] },
+          { elementType: 'labels.text.fill', stylers: [{ color: '#888' }] },
+          { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: '#23242A' }] },
+          { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#23242A' }] },
+          { featureType: 'poi', elementType: 'labels.text', stylers: [{ visibility: 'off' }] },
+          // ROUTES plus visibles (gris clair ou bleu)
+          { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#3A3D4D' }] },
+          { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#5A5D6D' }] },
+          { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#bbb' }] },
+          { featureType: 'road', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+          { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#23242A' }] },
+          { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#181A20' }] },
+          { featureType: 'water', elementType: 'labels.text', stylers: [{ visibility: 'off' }] },
+        ]
       });
       // Ajout de la couche trafic
       const trafficLayer = new (window as any).google.maps.TrafficLayer();

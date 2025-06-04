@@ -6,14 +6,20 @@ import { useHeading } from "../../hooks/useHeading";
 import MapView, { Marker, PROVIDER_GOOGLE, AnimatedRegion } from 'react-native-maps';
 
 const DARK_MAP_STYLE = [
-  { elementType: 'geometry', stylers: [{ color: '#181B2C' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#181B2C' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#A259FF' }] },
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#23242A' }] },
-  { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#888' }] },
+  { elementType: 'geometry', stylers: [{ color: '#181A20' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#181A20' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#888' }] },
+  { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: '#23242A' }] },
   { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#23242A' }] },
+  { featureType: 'poi', elementType: 'labels.text', stylers: [{ visibility: 'off' }] },
+  // ROUTES plus visibles (gris clair ou bleu)
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#3A3D4D' }] },
+  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#5A5D6D' }] },
+  { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#bbb' }] },
+  { featureType: 'road', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+  { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#23242A' }] },
   { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#181A20' }] },
-  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+  { featureType: 'water', elementType: 'labels.text', stylers: [{ visibility: 'off' }] },
 ];
 
 export default function CustomMapView({ color = "#A259FF" }: { color?: string }) {

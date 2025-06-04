@@ -233,9 +233,10 @@ export default function ExploreVoitureScreen() {
         <MapView
           key={recenterKey}
           color="#2979FF"
+          // Thème sombre ajusté : routes plus claires pour meilleure visibilité
         />
-        {/* Bouton recentrer cross-platform */}
-        <View style={{ position: 'absolute', top: 18, right: 64, zIndex: 20 }}>
+        {/* Bouton recentrer cross-platform - remis bien en haut à droite */}
+        <View style={{ position: 'absolute', top: 18, right: 18, zIndex: 20 }}>
           <View style={{ backgroundColor: '#23242A', borderRadius: 24, padding: 8, shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 6 }}>
             <Ionicons name="locate" size={28} color="#2979FF" onPress={() => {
               if (Platform.OS === 'web') {
