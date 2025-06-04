@@ -37,6 +37,25 @@ export default function MapView({ color = "#A259FF" }: { color?: string }) {
   const lat = location?.coords?.latitude ?? 48.8584;
   const lon = location?.coords?.longitude ?? 2.2945;
 
+  // Gestion du heading boussole (rotor) sur le web
+  const [compassHeading, setCompassHeading] = React.useState<number | null>(null);
+  React.useEffect(() => {
+    function handleOrientation(event: DeviceOrientationEvent) {
+      // event.alpha = 0 (nord), 90 (est), 180 (sud), 270 (ouest)
+      if (typeof event.alpha === 'number') {
+        setCompassHeading(360 - event.alpha); // Inverse pour correspondre au GPS
+      }
+    }
+    if (window.DeviceOrientationEvent) {
+      window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+      window.addEventListener('deviceorientation', handleOrientation, true);
+      return () => {
+        window.removeEventListener('deviceorientationabsolute', handleOrientation, true);
+        window.removeEventListener('deviceorientation', handleOrientation, true);
+      };
+    }
+  }, []);
+
   // Recentrage
   const handleRecenter = () => {
     setCentered(true);
@@ -69,13 +88,16 @@ export default function MapView({ color = "#A259FF" }: { color?: string }) {
       const newCenter = mapRef.current.unproject(center);
       // Zoom dynamique selon la vitesse (plus rapide = plus loin)
       const speed = location?.coords?.speed || 0;
+      // Choix du heading : GPS si vitesse > 2 km/h, sinon boussole
+      let heading = location?.coords?.heading;
+      if (!heading || speed * 3.6 < 2) heading = compassHeading ?? heading ?? 0;
       let zoom = 17 - (speed / 60);
       if (zoom < 15) zoom = 15;
       if (zoom > 17) zoom = 17;
       mapRef.current.flyTo({
         center: [newCenter.lng, newCenter.lat],
         zoom,
-        bearing: location?.coords?.heading ?? 0,
+        bearing: heading,
         pitch: 65, // Effet 3D plus marqué
         speed: 1.2,
         essential: true

@@ -33,7 +33,7 @@ export default function CustomMapView({ color = "#A259FF" }: { color?: string })
       // Choix du heading : GPS si vitesse > 2 km/h, sinon boussole
       const speed = location?.coords?.speed || 0;
       let heading = location?.coords?.heading;
-      if (!heading || speed * 3.6 < 2) heading = compassHeading ?? 0;
+      if (!heading || speed * 3.6 < 2) heading = compassHeading ?? heading ?? 0;
       const rad = (heading - 90) * Math.PI / 180;
       const dLat = Math.cos(rad) * offsetLat;
       const dLon = Math.sin(rad) * offsetLat;
