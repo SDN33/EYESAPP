@@ -13,6 +13,11 @@ import { getAddressFromCoords, getSpeedLimitFromCoords } from "../../utils/roadI
 import { IconSymbol } from "../ui/IconSymbol";
 import ExploreVoitureScreen, { ModernSpeedometer } from "./ExploreVoitureScreen";
 
+// Clé Google API pour le trafic (web ou mobile)
+const GOOGLE_API_KEY = Platform.OS === "web"
+  ? "AIzaSyBmVBiIzMDvK9U6Xf3mHCo33KGLXeC8FK0"
+  : (process.env.GOOGLE_API_KEY || "");
+
 export default function ExploreMotoScreen() {
   const { hasConsent, acceptConsent } = useConsent();
   const { location } = useLocation();
@@ -86,6 +91,42 @@ export default function ExploreMotoScreen() {
 
   // Affichage d'une notification si une alerte communautaire (danger/bouchon) est proche (< 300m)
   const nearbyAlert = undefined; // plus de notif communautaire
+
+  const [trafficAlert, setTrafficAlert] = useState<string | null>(null);
+
+  // Détection trafic en temps réel (web uniquement, mock sur mobile)
+  useEffect(() => {
+    if (!location?.coords) return;
+    let interval: any;
+    async function checkTraffic() {
+      if (!location?.coords) return;
+      try {
+        const { latitude, longitude } = location.coords;
+        // On simule un trajet de 1km vers le nord
+        const destLat = latitude + 0.009;
+        const destLon = longitude;
+        const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${latitude},${longitude}&destination=${destLat},${destLon}&departure_time=now&key=${GOOGLE_API_KEY}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.routes && data.routes[0] && data.routes[0].legs && data.routes[0].legs[0]) {
+          const leg = data.routes[0].legs[0];
+          const duration = leg.duration.value; // en secondes
+          const durationInTraffic = leg.duration_in_traffic?.value || duration;
+          // Si le temps en trafic est 50% plus long que le temps normal, on notifie
+          if (durationInTraffic > duration * 1.5) {
+            setTrafficAlert("Trafic dense détecté à proximité");
+          } else {
+            setTrafficAlert(null);
+          }
+        }
+      } catch {
+        setTrafficAlert(null);
+      }
+    }
+    checkTraffic();
+    interval = setInterval(checkTraffic, 30000); // toutes les 30s
+    return () => clearInterval(interval);
+  }, [location?.coords]);
 
   if (hasConsent === false) {
     return <ConsentModal visible onAccept={acceptConsent} />;
@@ -251,6 +292,15 @@ export default function ExploreMotoScreen() {
           </Text>
         </View>
       ) : null}
+      {/* Notification trafic en temps réel */}
+      {trafficAlert && (
+        <View style={{ position: 'absolute', top: 18, left: 0, right: 0, alignItems: 'center', zIndex: 50 }}>
+          <View style={{ backgroundColor: '#F59E42', borderRadius: 16, paddingHorizontal: 18, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 8, elevation: 3 }}>
+            <Ionicons name="car" size={22} color="#fff" style={{ marginRight: 10 }} />
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>{trafficAlert}</Text>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
