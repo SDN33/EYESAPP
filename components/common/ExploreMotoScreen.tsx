@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { View, Text, StyleSheet, Easing, Platform, Dimensions } from "react-native";
 import Animated, { useSharedValue, withTiming } from "react-native-reanimated";
-import Svg, { Path, Circle, Defs, LinearGradient, Stop, RadialGradient } from "react-native-svg";
 import { useLocation } from "../../hooks/useLocation";
 import { useLeanAngle } from "../../hooks/useLeanAngle";
 import ConsentModal from "../../components/common/ConsentModal";
@@ -47,6 +46,10 @@ export default function ExploreMotoScreen() {
   }, [location?.coords]);
   const isOverLimit = speedLimit !== null && speed > speedLimit;
 
+  // TODO: Replace these with real detection logic or props
+  const leftDetected = true;
+  const rightDetected = false;
+
   const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
   const isSmallScreen = screenWidth < 370 || screenHeight < 700;
 
@@ -81,12 +84,61 @@ export default function ExploreMotoScreen() {
           </View>
           <Text style={[styles.limitLabel, isSmallScreen && { fontSize: 11 }]}>Limite de vitesse</Text>
         </View>
-        {/* Alerte radar */}
-        <View style={[styles.radarAlertBox, { backgroundColor: "#A259FF" }, isSmallScreen && { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 12, marginTop: 4 }]}> 
-          <View style={[styles.radarAlertIcon, isSmallScreen && { padding: 3, marginRight: 3 }]}><Ionicons name="alert-circle" size={isSmallScreen ? 13 : 20} color="#fff" /></View>
-          <Text style={[styles.radarAlertText, { color: "#fff" }, isSmallScreen && { fontSize: 11 }]}>Une Auto est à proximité</Text>
-          <Text style={[styles.radarAlertDist, { color: "#fff" }, isSmallScreen && { fontSize: 12, marginLeft: 4 }]}>50 m</Text>
-        </View>
+        {/* Alerte radar moderne et dynamique (véhicule à proximité) */}
+        {leftDetected || rightDetected ? (
+          <View style={{
+            marginTop: isSmallScreen ? 6 : 16,
+            alignSelf: 'center',
+            backgroundColor: '#23242A',
+            borderRadius: 18,
+            paddingHorizontal: isSmallScreen ? 18 : 32,
+            paddingVertical: isSmallScreen ? 8 : 14,
+            flexDirection: 'row',
+            alignItems: 'center',
+            shadowColor: '#A259FF',
+            shadowOpacity: 0.18,
+            shadowRadius: 12,
+            borderWidth: 1.5,
+            borderColor: leftDetected ? '#EF4444' : rightDetected ? '#EF4444' : '#A259FF',
+            gap: isSmallScreen ? 8 : 16,
+            minWidth: isSmallScreen ? 180 : 240,
+            justifyContent: 'center',
+            elevation: 2,
+            opacity: 0.97
+          }}>
+            <Ionicons name={leftDetected ? 'bicycle' : 'car-sport'} size={isSmallScreen ? 20 : 28} color={leftDetected ? '#EF4444' : '#A259FF'} style={{ marginRight: 8 }} />
+            <Text style={{
+              color: leftDetected ? '#EF4444' : '#A259FF',
+              fontWeight: 'bold',
+              fontSize: isSmallScreen ? 14 : 18,
+              marginRight: 8,
+              letterSpacing: 0.5
+            }}>
+              {leftDetected ? 'Moto à proximité' : 'Auto à proximité'}
+            </Text>
+            <View style={{
+              backgroundColor: leftDetected ? '#EF4444' : '#A259FF',
+              borderRadius: 8,
+              paddingHorizontal: 10,
+              paddingVertical: 4,
+              marginLeft: 4
+            }}>
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: isSmallScreen ? 12 : 14 }}>50 m</Text>
+            </View>
+            <Animated.View style={{
+              marginLeft: 8,
+              width: isSmallScreen ? 10 : 16,
+              height: isSmallScreen ? 10 : 16,
+              borderRadius: 99,
+              backgroundColor: leftDetected ? '#EF4444' : '#A259FF',
+              opacity: 0.7,
+              transform: [{ scale: leftDetected || rightDetected ? 1.2 : 1 }],
+              shadowColor: leftDetected ? '#EF4444' : '#A259FF',
+              shadowOpacity: 0.5,
+              shadowRadius: 8
+            }} />
+          </View>
+        ) : null}
       </View>
       {/* Bas : Carte GPS (50%) */}
       <View style={{ flex: 1, overflow: "hidden", borderTopLeftRadius: 32, borderTopRightRadius: 32 }}>
@@ -236,38 +288,6 @@ const styles = StyleSheet.create({
   },
   limitLabel: {
     color: "#aaa", fontSize: 16
-  },
-  radarAlertBox: {
-    backgroundColor: "#A259FF",
-    borderRadius: 18,
-    paddingHorizontal: 28,
-    paddingVertical: 16,
-    marginTop: 18,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    ...Platform.select({
-      web: {
-        boxShadow: "0 2px 16px 0 #A259FF33",
-      },
-      default: {
-        shadowColor: "#A259FF",
-        shadowOpacity: 0.18,
-        shadowRadius: 12,
-      }
-    })
-  },
-  radarAlertIcon: {
-    backgroundColor: "#A259FF",
-    borderRadius: 999,
-    padding: 10,
-    marginRight: 10
-  },
-  radarAlertText: {
-    color: "#fff", fontWeight: "bold", fontSize: 18
-  },
-  radarAlertDist: {
-    color: "#fff", fontSize: 20, fontWeight: "bold", marginLeft: 14
   },
   weatherBox: {
     marginLeft: 18,

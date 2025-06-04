@@ -8,7 +8,6 @@ import { useConsent } from "../../hooks/useConsent";
 import MapView from "./MapView";
 import { Ionicons } from '@expo/vector-icons';
 import { getAddressFromCoords, getSpeedLimitFromCoords } from "../../utils/roadInfo";
-import { IconSymbol } from "../ui/IconSymbol";
 import { getWeatherFromCoords } from "../../services/api";
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useLeanAngle } from "../../hooks/useLeanAngle";
@@ -63,6 +62,10 @@ export default function ExploreVoitureScreen() {
     }
   };
 
+  // TODO: Replace these with real detection logic or props
+  const leftDetected = true; // Forcé pour la démo
+  const rightDetected = false;
+
   if (hasConsent === false) {
     return <ConsentModal visible onAccept={acceptConsent} />;
   }
@@ -79,6 +82,7 @@ export default function ExploreVoitureScreen() {
             <Text style={[styles.modeLabel, isSmallScreen && { fontSize: 12, marginTop: 0 }]}>Auto</Text>
           </View>
           <View style={styles.speedoWrap}>
+            {/* Suppression AngleMortUI */}
             <ModernSpeedometer speed={speed} speedLimit={speedLimit ?? 0} isOverLimit={isOverLimit} color="#60A5FA" />
           </View>
           <View style={[styles.weatherBox, isSmallScreen && { paddingVertical: 4, paddingHorizontal: 8, minWidth: 40, marginLeft: 8 }] }>
@@ -86,7 +90,6 @@ export default function ExploreVoitureScreen() {
               <>
                 <MaterialIcons name={weather.icon as any} size={isSmallScreen ? 20 : 28} color="#60A5FA" style={{ marginBottom: 2 }} />
                 <Text style={[styles.weatherValue, isSmallScreen && { fontSize: 13 }]}>{Math.round(weather.temperature)}°C</Text>
-                <Text style={[styles.weatherLabel, isSmallScreen && { fontSize: 10, marginTop: -2 }]}>{weather.description}</Text>
               </>
             ) : (
               <Text style={[styles.weatherLabel, isSmallScreen && { fontSize: 10, marginTop: -2 }]}>Météo…</Text>
@@ -99,12 +102,61 @@ export default function ExploreVoitureScreen() {
           </View>
           <Text style={[styles.limitLabel, isSmallScreen && { fontSize: 11 }]}>Limite de vitesse</Text>
         </View>
-        {/* Alerte radar */}
-        <View style={[styles.radarAlertBox, { backgroundColor: "#60A5FA" }, isSmallScreen && { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 12, marginTop: 4 }]}> 
-          <View style={[styles.radarAlertIcon, isSmallScreen && { padding: 3, marginRight: 3 }]}><Ionicons name="alert-circle" size={isSmallScreen ? 13 : 20} color="#fff" /></View>
-          <Text style={[styles.radarAlertText, { color: "#fff" }, isSmallScreen && { fontSize: 11 }]}>Une Moto est à proximité</Text>
-          <Text style={[styles.radarAlertDist, { color: "#fff" }, isSmallScreen && { fontSize: 12, marginLeft: 4 }]}>120 m</Text>
-        </View>
+        {/* Notification moderne et dynamique (moto à proximité) */}
+        {(leftDetected || rightDetected) && (
+          <View style={{
+            marginTop: isSmallScreen ? 6 : 16,
+            alignSelf: 'center',
+            backgroundColor: '#23242A',
+            borderRadius: 18,
+            paddingHorizontal: isSmallScreen ? 18 : 32,
+            paddingVertical: isSmallScreen ? 8 : 14,
+            flexDirection: 'row',
+            alignItems: 'center',
+            shadowColor: '#60A5FA',
+            shadowOpacity: 0.18,
+            shadowRadius: 12,
+            borderWidth: 1.5,
+            borderColor: leftDetected ? '#EF4444' : rightDetected ? '#EF4444' : '#60A5FA',
+            gap: isSmallScreen ? 8 : 16,
+            minWidth: isSmallScreen ? 180 : 240,
+            justifyContent: 'center',
+            elevation: 2,
+            opacity: 0.97
+          }}>
+            <Ionicons name={leftDetected ? 'bicycle' : 'car-sport'} size={isSmallScreen ? 20 : 28} color={leftDetected ? '#EF4444' : '#60A5FA'} style={{ marginRight: 8 }} />
+            <Text style={{
+              color: leftDetected ? '#EF4444' : '#60A5FA',
+              fontWeight: 'bold',
+              fontSize: isSmallScreen ? 14 : 18,
+              marginRight: 8,
+              letterSpacing: 0.5
+            }}>
+              {leftDetected ? 'Moto à proximité' : 'Auto à proximité'}
+            </Text>
+            <View style={{
+              backgroundColor: leftDetected ? '#EF4444' : '#60A5FA',
+              borderRadius: 8,
+              paddingHorizontal: 10,
+              paddingVertical: 4,
+              marginLeft: 4
+            }}>
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: isSmallScreen ? 12 : 14 }}>120 m</Text>
+            </View>
+            <Animated.View style={{
+              marginLeft: 8,
+              width: isSmallScreen ? 10 : 16,
+              height: isSmallScreen ? 10 : 16,
+              borderRadius: 99,
+              backgroundColor: leftDetected ? '#EF4444' : '#60A5FA',
+              opacity: 0.7,
+              transform: [{ scale: leftDetected || rightDetected ? 1.2 : 1 }],
+              shadowColor: leftDetected ? '#EF4444' : '#60A5FA',
+              shadowOpacity: 0.5,
+              shadowRadius: 8
+            }} />
+          </View>
+        )}
       </View>
       {/* Bas : Carte GPS (50%) */}
       <View style={{ flex: 1, overflow: "hidden", borderTopLeftRadius: 32, borderTopRightRadius: 32 }}>
