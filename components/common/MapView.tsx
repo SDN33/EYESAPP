@@ -1,9 +1,10 @@
 // MapView.tsx : version mobile (Expo/React Native)
-import React, { useEffect, useRef } from "react";
-import { View, Platform, Animated } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import { View, Platform, Animated, TouchableOpacity } from "react-native";
 import { useLocation } from "../../hooks/useLocation";
 import { useHeading } from "../../hooks/useHeading";
 import MapView, { Marker, PROVIDER_GOOGLE, AnimatedRegion } from 'react-native-maps';
+import Svg, { Polygon } from 'react-native-svg';
 
 const DARK_MAP_STYLE = [
   { elementType: 'geometry', stylers: [{ color: '#181A20' }] },
@@ -29,8 +30,9 @@ export default function CustomMapView({ color = "#A259FF" }: { color?: string })
   const mapRef = useRef<MapView>(null);
   const markerRef = useRef<any>(null);
   const compassHeading = useHeading();
+  const [isFollowing, setIsFollowing] = useState(true);
 
-  // Recentrage sur la position GPS réelle au montage (key change)
+  // Recentrage automatique sur la position GPS à l'ouverture
   useEffect(() => {
     if (mapRef.current && lat && lon) {
       mapRef.current.animateCamera({
@@ -83,39 +85,38 @@ export default function CustomMapView({ color = "#A259FF" }: { color?: string })
         }}
         customMapStyle={DARK_MAP_STYLE}
         showsUserLocation={true}
-        followsUserLocation={true}
-        showsMyLocationButton={true}
+        followsUserLocation={isFollowing}
+        showsMyLocationButton={false} // désactive le bouton natif
         showsCompass={true}
         showsBuildings={false}
-        toolbarEnabled={false}
+        toolbarEnabled={true}
         minZoomLevel={10}
         maxZoomLevel={19}
+        onPanDrag={() => setIsFollowing(false)}
       >
         {lat && lon && (
           <Marker.Animated
-            ref={markerRef}
             coordinate={{ latitude: lat, longitude: lon }}
             anchor={{ x: 0.5, y: 0.5 }}
             flat
           >
-            {/* Marker custom bleu ou violet selon le mode, identique web/mobile */}
             <View style={{
-              width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(30,30,40,0.95)',
-              alignItems: 'center', justifyContent: 'center',
-              borderWidth: 2, borderColor: color === '#A259FF' ? '#A259FF' : '#2979FF',
-              shadowColor: color === '#A259FF' ? '#A259FF' : '#2979FF', shadowOpacity: 0.6, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
+              width: 36, height: 36, alignItems: 'center', justifyContent: 'center',
+              backgroundColor: 'rgba(30,30,40,0.95)', borderRadius: 18,
+              borderWidth: 2, borderColor: color,
+              shadowColor: color, shadowOpacity: 0.6, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
               elevation: 8,
             }}>
               <View style={{
                 width: 28, height: 28, transform: [{ rotate: `${location?.coords?.heading ?? 0}deg` }],
                 alignItems: 'center', justifyContent: 'center',
               }}>
-                {/* Triangle bleu ou violet façon web, version RN */}
+                {/* Triangle qui pointe vers la direction du téléphone */}
                 <View style={{
                   width: 0, height: 0,
                   borderLeftWidth: 14, borderRightWidth: 14,
                   borderBottomWidth: 24, borderLeftColor: 'transparent', borderRightColor: 'transparent',
-                  borderBottomColor: color === '#A259FF' ? '#A259FF' : '#2979FF',
+                  borderBottomColor: color,
                   borderTopWidth: 0, borderTopColor: 'transparent',
                 }} />
                 {/* Contour blanc */}
@@ -128,6 +129,31 @@ export default function CustomMapView({ color = "#A259FF" }: { color?: string })
           </Marker.Animated>
         )}
       </MapView>
+      {/* Bouton unique de recentrage, toujours visible en haut à droite */}
+      <TouchableOpacity
+        style={{ position: 'absolute', top: 24, right: 24, backgroundColor: isFollowing ? '#60A5FA' : '#23242A', borderRadius: 24, padding: 12, shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 6, zIndex: 100 }}
+        onPress={() => {
+          setIsFollowing(true);
+          if (mapRef.current && lat && lon) {
+            mapRef.current.animateCamera({
+              center: { latitude: lat, longitude: lon },
+              zoom: 17,
+              pitch: 65
+            }, { duration: 500 });
+          }
+        }}
+      >
+        <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+          {/* Icône 3D dédiée pour la vue immersive */}
+          <View style={{ width: 28, height: 28, alignItems: 'center', justifyContent: 'center' }}>
+            <Svg width={24} height={24} viewBox="0 0 24 24">
+              <Polygon points="12,2 22,7 12,12 2,7" fill={isFollowing ? '#60A5FA' : '#888'} />
+              <Polygon points="12,12 22,7 22,17 12,22" fill={isFollowing ? '#3B82F6' : '#444'} />
+              <Polygon points="12,12 2,7 2,17 12,22" fill={isFollowing ? '#2563EB' : '#222'} />
+            </Svg>
+          </View>
+        </View>
+      </TouchableOpacity>
     </View>
   );
 }

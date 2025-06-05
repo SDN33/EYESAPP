@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, Easing, Platform, Dimensions, TouchableOpacity, FlatList, Modal } from "react-native";
-import Animated, { useSharedValue, withTiming } from "react-native-reanimated";
+import { View, Text, StyleSheet, Platform, Dimensions, TouchableOpacity, FlatList, Modal } from "react-native";
+import Animated, { useSharedValue, withTiming, Easing } from "react-native-reanimated";
 import { useLocation } from "../../hooks/useLocation";
 import { useLeanAngle } from "../../hooks/useLeanAngle";
 import ConsentModal from "../../components/common/ConsentModal";
@@ -235,18 +235,6 @@ export default function ExploreMotoScreen() {
           key={recenterKey}
           color="#A259FF"
         />
-        {/* Bouton recentrer cross-platform */}
-        <View style={{ position: 'absolute', top: 18, right: 64, zIndex: 20 }}>
-          <View style={{ backgroundColor: '#23242A', borderRadius: 24, padding: 8, shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 6 }}>
-            <Ionicons name="locate" size={28} color="#A259FF" onPress={() => {
-              if (Platform.OS === 'web') {
-                window.dispatchEvent(new Event('recenter-map'));
-              } else {
-                setRecenterKey(k => k + 1);
-              }
-            }} />
-          </View>
-        </View>
         {/* Bouton flottant signalement, discret en haut à gauche */}
         <TouchableOpacity
           style={{ position: 'absolute', top: 58, left: 18, backgroundColor: '#23242A', borderRadius: 18, padding: 8, shadowColor: '#000', shadowOpacity: 0.10, shadowRadius: 4, zIndex: 30, opacity: 0.85 }}
