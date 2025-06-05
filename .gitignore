@@ -3,4 +3,8 @@
 
 expo-env.d.ts
 node_modules/
-# @end expo-cli
+# @end expo-clinode_modules/
+*.so
+*.aar
+android/build/
+ios/build/
