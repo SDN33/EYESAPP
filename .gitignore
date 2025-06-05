@@ -8,3 +8,8 @@ node_modules/
 *.aar
 android/build/
 ios/build/
+node_modules/
+*.so
+*.aar
+android/build/
+ios/build/
