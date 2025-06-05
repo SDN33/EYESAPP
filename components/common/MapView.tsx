@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { View, Platform, Animated, TouchableOpacity } from "react-native";
 import { useLocation } from "../../hooks/useLocation";
 import { useHeading } from "../../hooks/useHeading";
-import MapView, { Marker, PROVIDER_GOOGLE, AnimatedRegion } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import Svg, { Polygon } from 'react-native-svg';
 
 const DARK_MAP_STYLE = [
@@ -32,7 +32,23 @@ export default function CustomMapView({ color = "#A259FF" }: { color?: string })
   const compassHeading = useHeading();
   const [isFollowing, setIsFollowing] = useState(true);
 
-  // Recentrage automatique sur la position GPS à l'ouverture
+  // Recentrage immersif 1s après le chargement initial de la carte
+  useEffect(() => {
+    if (mapRef.current && lat && lon) {
+      const timeout = setTimeout(() => {
+        mapRef.current?.animateCamera({
+          center: { latitude: lat, longitude: lon },
+          zoom: 17,
+          pitch: 65,
+          heading: location?.coords?.heading || 0,
+        }, { duration: 500 });
+        setIsFollowing(true);
+      }, 1000);
+      return () => clearTimeout(timeout);
+    }
+  }, [lat, lon]);
+
+  // Recentrage immédiat si la position devient disponible après le premier rendu
   useEffect(() => {
     if (mapRef.current && lat && lon) {
       mapRef.current.animateCamera({
@@ -41,6 +57,7 @@ export default function CustomMapView({ color = "#A259FF" }: { color?: string })
         pitch: 65,
         heading: location?.coords?.heading || 0,
       }, { duration: 500 });
+      setIsFollowing(true);
     }
   }, [lat, lon]);
 
@@ -90,53 +107,60 @@ export default function CustomMapView({ color = "#A259FF" }: { color?: string })
         showsCompass={true}
         showsBuildings={false}
         toolbarEnabled={true}
-        minZoomLevel={10}
+        minZoomLevel={6}
         maxZoomLevel={19}
         onPanDrag={() => setIsFollowing(false)}
-        mapPadding={{ top: 0, right: 0, bottom: 100, left: 0 }} // décale le logo Google hors de la vue
+        mapPadding={{ top: 0, right: 0, bottom: 80, left: 0 }} // padding bas raisonnable pour cacher le logo
       >
         {lat && lon && (
           <Marker.Animated
-            coordinate={{ latitude: lat, longitude: lon }}
-            anchor={{ x: 0.5, y: 0.5 }}
-            flat
+        coordinate={{ latitude: lat, longitude: lon }}
+        anchor={{ x: 0.5, y: 0.5 }}
+        flat
           >
+        <View style={{
+          width: 36, height: 36, alignItems: 'center', justifyContent: 'center',
+          backgroundColor: 'rgba(30,30,40,0.95)', borderRadius: 18,
+          borderWidth: 2, borderColor: color,
+          shadowColor: color, shadowOpacity: 0.6, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
+          elevation: 8,
+        }}>
+          <View style={{
+            width: 28, height: 28, transform: [{ rotate: `${location?.coords?.heading ?? 0}deg` }],
+            alignItems: 'center', justifyContent: 'center',
+          }}>
+            {/* Triangle qui pointe vers la direction du téléphone */}
             <View style={{
-              width: 36, height: 36, alignItems: 'center', justifyContent: 'center',
-              backgroundColor: 'rgba(30,30,40,0.95)', borderRadius: 18,
-              borderWidth: 2, borderColor: color,
-              shadowColor: color, shadowOpacity: 0.6, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
-              elevation: 8,
-            }}>
-              <View style={{
-                width: 28, height: 28, transform: [{ rotate: `${location?.coords?.heading ?? 0}deg` }],
-                alignItems: 'center', justifyContent: 'center',
-              }}>
-                {/* Triangle qui pointe vers la direction du téléphone */}
-                <View style={{
-                  width: 0, height: 0,
-                  borderLeftWidth: 14, borderRightWidth: 14,
-                  borderBottomWidth: 24, borderLeftColor: 'transparent', borderRightColor: 'transparent',
-                  borderBottomColor: color,
-                  borderTopWidth: 0, borderTopColor: 'transparent',
-                }} />
-                {/* Contour blanc */}
-                <View style={{
-                  position: 'absolute', top: 0, left: 0, width: 28, height: 28,
-                  borderRadius: 14, borderWidth: 2.5, borderColor: '#fff',
-                }} />
-              </View>
-            </View>
+          width: 0, height: 0,
+          borderLeftWidth: 14, borderRightWidth: 14,
+          borderBottomWidth: 24, borderLeftColor: 'transparent', borderRightColor: 'transparent',
+          borderBottomColor: color,
+          borderTopWidth: 0, borderTopColor: 'transparent',
+            }} />
+            {/* Contour blanc */}
+            <View style={{
+          position: 'absolute', top: 0, left: 0, width: 28, height: 28,
+          borderRadius: 14, borderWidth: 2.5, borderColor: '#fff',
+            }} />
+          </View>
+        </View>
           </Marker.Animated>
         )}
       </MapView>
-      {/* Overlay pour cacher le logo Google si besoin (Android/iOS) */}
-      <View pointerEvents="none" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 60, backgroundColor: '#181A20', zIndex: 99 }} />
-      {/* Hack supplémentaire : masque tout ce qui est à l'intérieur du bas de la map (logo Google inclus) */}
-      <View pointerEvents="none" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 60, backgroundColor: '#181A20', opacity: 0.99, zIndex: 100 }} />
       {/* Bouton unique de recentrage, toujours visible en haut à droite */}
       <TouchableOpacity
-        style={{ position: 'absolute', top: 24, right: 24, backgroundColor: isFollowing ? '#60A5FA' : '#23242A', borderRadius: 24, padding: 12, shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 6, zIndex: 100 }}
+        style={{
+          position: 'absolute',
+          top: 7, // encore plus haut
+          right: 24,
+          backgroundColor: isFollowing ? color : '#23242A', // couleur dynamique selon le mode
+          borderRadius: 24,
+          padding: 12,
+          shadowColor: '#000',
+          shadowOpacity: 0.18,
+          shadowRadius: 6,
+          zIndex: 100
+        }}
         onPress={() => {
           setIsFollowing(true);
           if (mapRef.current && lat && lon) {
@@ -152,9 +176,9 @@ export default function CustomMapView({ color = "#A259FF" }: { color?: string })
           {/* Icône 3D dédiée pour la vue immersive */}
           <View style={{ width: 28, height: 28, alignItems: 'center', justifyContent: 'center' }}>
             <Svg width={24} height={24} viewBox="0 0 24 24">
-              <Polygon points="12,2 22,7 12,12 2,7" fill={isFollowing ? '#60A5FA' : '#888'} />
-              <Polygon points="12,12 22,7 22,17 12,22" fill={isFollowing ? '#3B82F6' : '#444'} />
-              <Polygon points="12,12 2,7 2,17 12,22" fill={isFollowing ? '#2563EB' : '#222'} />
+              <Polygon points="12,2 22,7 12,12 2,7" fill={isFollowing ? color : '#888'} />
+              <Polygon points="12,12 22,7 22,17 12,22" fill={isFollowing ? (color === '#A259FF' ? '#7C3AED' : '#3B82F6') : '#444'} />
+              <Polygon points="12,12 2,7 2,17 12,22" fill={isFollowing ? (color === '#A259FF' ? '#6D28D9' : '#2563EB') : '#222'} />
             </Svg>
           </View>
         </View>

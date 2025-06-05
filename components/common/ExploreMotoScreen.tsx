@@ -12,11 +12,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { getAddressFromCoords, getSpeedLimitFromCoords } from "../../utils/roadInfo";
 import { IconSymbol } from "../ui/IconSymbol";
 import ExploreVoitureScreen, { ModernSpeedometer } from "./ExploreVoitureScreen";
+import Constants from 'expo-constants';
 
 // Clé Google API pour le trafic (web ou mobile)
-const GOOGLE_API_KEY = Platform.OS === "web"
-  ? "AIzaSyBmVBiIzMDvK9U6Xf3mHCo33KGLXeC8FK0"
-  : (process.env.GOOGLE_API_KEY || "");
+const GOOGLE_API_KEY = Constants.expoConfig?.extra?.GOOGLE_API_KEY || "";
 
 export default function ExploreMotoScreen() {
   const { hasConsent, acceptConsent } = useConsent();

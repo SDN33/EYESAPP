@@ -12,11 +12,10 @@ import { getWeatherFromCoords } from "../../services/api";
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useLeanAngle } from "../../hooks/useLeanAngle";
 import { Platform } from "react-native";
+import Constants from 'expo-constants';
 
 // Clé Google API pour le trafic (web ou mobile)
-const GOOGLE_API_KEY = Platform.OS === "web"
-  ? "AIzaSyBmVBiIzMDvK9U6Xf3mHCo33KGLXeC8FK0"
-  : (process.env.GOOGLE_API_KEY || "");
+const GOOGLE_API_KEY = Constants.expoConfig?.extra?.GOOGLE_API_KEY || "";
 
 export default function ExploreVoitureScreen() {
   const { hasConsent, acceptConsent } = useConsent();

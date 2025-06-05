@@ -21,16 +21,31 @@ export default function CommunityScreen() {
   const isDark = true; // Remplacez ceci par votre logique de détection du thème
 
   useEffect(() => {
-    sanityClient
-      .fetch(`*[_type == "post"]{_id, title, slug, publishedAt, image, body}`)
-      .then((data: Post[]) => {
+    // Utilise un proxy CORS côté web uniquement
+    const fetchPosts = async () => {
+      try {
+        let data;
+        if (Platform.OS === 'web') {
+          // Proxy CORS pour le web
+          const query = encodeURIComponent('*[_type == "post"]{_id, title, slug, publishedAt, image, body}');
+          const projectId = 'o23wpsz2';
+          const dataset = 'production';
+          const url = `https://corsproxy.io/?https://${projectId}.api.sanity.io/v2025-06-04/data/query/${dataset}?query=${query}`;
+          const res = await fetch(url);
+          if (!res.ok) throw new Error('Erreur Sanity (CORS)');
+          const json = await res.json();
+          data = json.result;
+        } else {
+          data = await sanityClient.fetch(`*[_type == "post"]{_id, title, slug, publishedAt, image, body}`);
+        }
         setPosts(data);
         setLoading(false);
-      })
-      .catch((err: any) => {
+      } catch (err: any) {
         setError(err.message || "Erreur de chargement");
         setLoading(false);
-      });
+      }
+    };
+    fetchPosts();
   }, []);
 
   // Utilitaire pour obtenir l'URL de l'image Sanity (robuste)
