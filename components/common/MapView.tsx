@@ -76,7 +76,7 @@ export default function CustomMapView({ color = "#A259FF" }: { color?: string })
       <MapView
         ref={mapRef}
         provider={PROVIDER_GOOGLE}
-        style={{ flex: 1, borderRadius: 24, overflow: 'hidden' }}
+        style={{ flex: 1, borderRadius: 0, overflow: 'hidden' }}
         initialRegion={{
           latitude: lat || 48.8584,
           longitude: lon || 2.2945,
@@ -86,13 +86,14 @@ export default function CustomMapView({ color = "#A259FF" }: { color?: string })
         customMapStyle={DARK_MAP_STYLE}
         showsUserLocation={true}
         followsUserLocation={isFollowing}
-        showsMyLocationButton={false} // désactive le bouton natif
+        showsMyLocationButton={false}
         showsCompass={true}
         showsBuildings={false}
         toolbarEnabled={true}
         minZoomLevel={10}
         maxZoomLevel={19}
         onPanDrag={() => setIsFollowing(false)}
+        mapPadding={{ top: 0, right: 0, bottom: 100, left: 0 }} // décale le logo Google hors de la vue
       >
         {lat && lon && (
           <Marker.Animated
@@ -129,6 +130,10 @@ export default function CustomMapView({ color = "#A259FF" }: { color?: string })
           </Marker.Animated>
         )}
       </MapView>
+      {/* Overlay pour cacher le logo Google si besoin (Android/iOS) */}
+      <View pointerEvents="none" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 60, backgroundColor: '#181A20', zIndex: 99 }} />
+      {/* Hack supplémentaire : masque tout ce qui est à l'intérieur du bas de la map (logo Google inclus) */}
+      <View pointerEvents="none" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 60, backgroundColor: '#181A20', opacity: 0.99, zIndex: 100 }} />
       {/* Bouton unique de recentrage, toujours visible en haut à droite */}
       <TouchableOpacity
         style={{ position: 'absolute', top: 24, right: 24, backgroundColor: isFollowing ? '#60A5FA' : '#23242A', borderRadius: 24, padding: 12, shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 6, zIndex: 100 }}
