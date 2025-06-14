@@ -89,11 +89,11 @@ android {
 
     namespace 'com.anonymous.motoangles'
     defaultConfig {
-        applicationId 'com.anonymous.motoangles'
+        applicationId 'com.anonymous.eyes'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
-        versionName "1.0.0"
+        versionName "1.0"
     }
     signingConfigs {
         debug {
