@@ -435,7 +435,7 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
   useEffect(() => {
     if (routeMode === 'navigating' && routeInfo && routeInfo.legs && routeInfo.legs[0].steps && routeInfo.legs[0].steps[currentStepIndex]) {
       const step = routeInfo.legs[0].steps[currentStepIndex];
-      const instruction = step.html_instructions.replace(/<[^>]+>/g, '');
+      const instruction = sanitizeHtml(step.html_instructions, { allowedTags: [], allowedAttributes: {} });
       Speech.speak(instruction, { language: 'fr-FR' });
     }
   }, [currentStepIndex, routeMode, routeInfo]);
