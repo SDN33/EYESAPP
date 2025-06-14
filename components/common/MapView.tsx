@@ -247,8 +247,10 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
     try {
       const apiKey = process.env.EXPO_PUBLIC_GOOGLE_API_KEY || 'AIzaSyBmVBiIzMDvK9U6Xf3mHCo33KGLXeC8FK0';
       const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${start.latitude},${start.longitude}&destination=${end.latitude},${end.longitude}&mode=driving&traffic_model=best_guess&departure_time=now&key=${apiKey}`;
+      console.log('Directions API URL:', url); // LOG URL
       const response = await fetch(url);
       const data = await response.json();
+      console.log('Directions API response:', JSON.stringify(data)); // LOG REPONSE
       if (data.routes && data.routes.length > 0) {
         const points = decodePolyline(data.routes[0].overview_polyline.points);
         setRoutePolyline(points);
