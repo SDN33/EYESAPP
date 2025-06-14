@@ -1,5 +1,6 @@
 // MapView.tsx : version mobile (Expo/React Native)
 import React, { useRef, useState, useEffect } from "react";
+import sanitizeHtml from "sanitize-html";
 import { View, TouchableOpacity, Platform, StatusBar, Text, Pressable, Animated as RNAnimated, FlatList, TouchableWithoutFeedback, Keyboard } from "react-native";
 import { useLocation } from "../../hooks/useLocation";
 import MapView, { Marker, PROVIDER_GOOGLE, Polyline } from 'react-native-maps';
@@ -714,7 +715,7 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
             <View style={{ marginTop: 10, marginBottom: 6, alignItems: 'center' }}>
               <Ionicons name="navigate" size={32} color={accentColor} style={{ marginBottom: 4 }} />
               <Text style={{ fontSize: 16, color: accentColor, fontWeight: '700', textAlign: 'center' }}>
-                {routeInfo.legs[0].steps[currentStepIndex].html_instructions.replace(/<[^>]+>/g, '')}
+                {sanitizeHtml(routeInfo.legs[0].steps[currentStepIndex].html_instructions, { allowedTags: [], allowedAttributes: {} })}
               </Text>
               <Text style={{ fontSize: 14, color: '#444', marginTop: 2, textAlign: 'center' }}>
                 {routeInfo.legs[0].steps[currentStepIndex].distance.text} | {routeInfo.legs[0].steps[currentStepIndex].duration.text}
