@@ -14,6 +14,9 @@ import { useTrafficLayer } from '../../hooks/useTrafficLayer';
 import { Modal, TextInput, ActivityIndicator } from 'react-native';
 import * as Speech from 'expo-speech';
 import Voice from '@react-native-voice/voice';
+import { toLatLng } from '../../utils/latLng';
+import { formatDistance } from '../../utils/formatDistance';
+import { TraceRecorder } from '../../utils/traceRecorder';
 
 const DARK_MAP_STYLE = [
   { elementType: 'geometry', stylers: [{ color: '#181A20' }] },
@@ -54,7 +57,10 @@ function getLightMapStyle(mode: MapMode = 'moto') {
   ];
 }
 
-export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearbyUsers = [], userId }: { color?: string, mode?: MapMode, nearbyUsers?: Array<{ id: string, name: string, lat: number, lng: number, mode?: string }>, userId: string }) {
+// Ajout d'un traceur global (hors React)
+const traceRecorder = new TraceRecorder();
+
+export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearbyUsers = [], userId, addressVisible = true }: { color?: string, mode?: MapMode, nearbyUsers?: Array<{ id: string, name: string, lat: number, lng: number, mode?: string }>, userId: string, addressVisible?: boolean }) {
   const { location } = useLocation();
   const lat = location?.coords?.latitude;
   const lon = location?.coords?.longitude;
@@ -269,18 +275,15 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
     setIsLoadingRoute(false);
   };
 
-  // Handler pour sélectionner un point sur la carte
+  // Handler pour sélectionner un point sur la carte (point de départ = position GPS)
   const handleMapPress = React.useCallback((e: any) => {
     if (routeMode === 'selecting') {
-      if (!routePoints.start) {
-        setRoutePoints({ start: e.nativeEvent.coordinate });
-      } else if (!routePoints.end) {
-        const end = e.nativeEvent.coordinate;
-        setRoutePoints(points => ({ ...points, end }));
-        fetchRoute(routePoints.start, end);
-      }
+      const end = e.nativeEvent.coordinate;
+      const start = lat && lon ? { latitude: lat, longitude: lon } : null;
+      setRoutePoints({ start, end });
+      if (start && end) fetchRoute(start, end);
     }
-  }, [routeMode, routePoints, fetchRoute]);
+  }, [routeMode, lat, lon, fetchRoute]);
 
   // Décodage polyline Google
   function decodePolyline(encoded: string) {
@@ -319,7 +322,8 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
       const response = await fetch(url);
       const data = await response.json();
       if (data.results && data.results.length > 0) {
-        return data.results[0].geometry.location;
+        const loc = data.results[0].geometry.location;
+        return toLatLng(loc);
       }
     } catch (e) {}
     setIsLoadingRoute(false);
@@ -358,7 +362,7 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
     setAutocompleteError(null);
     try {
       const apiKey = process.env.EXPO_PUBLIC_GOOGLE_API_KEY || 'AIzaSyBmVBiIzMDvK9U6Xf3mHCo33KGLXeC8FK0';
-      const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&language=fr&components=country:fr&key=${apiKey}`;
+      const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&language=fr&key=${apiKey}`;
       const response = await fetch(url);
       const data = await response.json();
       if (data.status !== 'OK') {
@@ -396,9 +400,10 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
       const data = await response.json();
       const loc = data.result.geometry.location;
       const start = lat && lon ? { latitude: lat, longitude: lon } : null;
-      if (loc && start) {
-        setRoutePoints({ start, end: loc });
-        fetchRoute(start, loc, () => setDestinationModalVisible(true));
+      const end = loc ? toLatLng(loc) : null;
+      if (end && start) {
+        setRoutePoints({ start, end });
+        fetchRoute(start, end, () => setDestinationModalVisible(true));
       } else {
         setRouteError('Position de départ inconnue.');
         setDestinationModalVisible(true);
@@ -502,6 +507,44 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
       setVoiceError("Impossible de démarrer la reconnaissance vocale.");
     }
   };
+
+  // Fonction pour valider le trajet et démarrer l'enregistrement du tracé
+  const handleValidateRoute = () => {
+    traceRecorder.start();
+    setRouteMode('navigating');
+  };
+
+  // Ajout d'un état pour gérer l'animation de la div navigation
+  const [navBoxY] = useState(new RNAnimated.Value(0));
+  const [addressVisibleState, setAddressVisible] = useState(true); // À adapter selon la logique d'affichage de la div adresse
+
+  // Fonction à appeler quand la div d'adresse disparaît
+  const handleAddressHide = () => {
+    setAddressVisible(false);
+    RNAnimated.timing(navBoxY, {
+      toValue: 1,
+      duration: 350,
+      useNativeDriver: true,
+    }).start();
+  };
+  // Fonction à appeler quand la div d'adresse réapparaît
+  const handleAddressShow = () => {
+    setAddressVisible(true);
+    RNAnimated.timing(navBoxY, {
+      toValue: 0,
+      duration: 350,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  // Ajoute un useEffect pour animer la div navigation selon addressVisible
+  useEffect(() => {
+    RNAnimated.timing(navBoxY, {
+      toValue: addressVisible ? 0 : 1,
+      duration: 350,
+      useNativeDriver: true,
+    }).start();
+  }, [addressVisible]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colorScheme === 'dark' ? '#181A20' : '#f6f7fa' }}>
@@ -664,6 +707,12 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' }}>
           <View style={{ backgroundColor: accentColorBg, borderRadius: 22, padding: 28, width: '88%', alignItems: 'center', shadowColor: accentColor, shadowOpacity: 0.10, shadowRadius: 12 }}>
+            <TouchableOpacity
+              onPress={() => setDestinationModalVisible(false)}
+              style={{ position: 'absolute', top: 12, right: 12, backgroundColor: accentColorLight, borderRadius: 18, padding: 7, zIndex: 10 }}
+            >
+              <Ionicons name="close" size={22} color={accentColor} />
+            </TouchableOpacity>
             <Text style={{ fontWeight: 'bold', fontSize: 20, color: accentColor, marginBottom: 14, letterSpacing: 0.5 }}>Où veux-tu aller ?</Text>
             <TextInput
               style={{ borderWidth: 1.5, borderColor: accentColorLight, borderRadius: 12, padding: 12, width: '100%', marginBottom: 8, fontSize: 17, backgroundColor: '#fff', color: '#222', shadowColor: accentColor, shadowOpacity: 0.04, shadowRadius: 2 }}
@@ -703,31 +752,80 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
             {isListening && <Text style={{ marginTop: 12, color: accentColor, fontWeight: '500' }}>Parle maintenant…</Text>}
             {voiceError && <Text style={{ marginTop: 12, color: 'red', fontWeight: '500' }}>{voiceError}</Text>}
             {(isLoadingRoute || autocompleteLoading) && <ActivityIndicator style={{ marginTop: 12 }} color={accentColor} />}
+            {/* Affichage du résumé itinéraire, sans répéter l'adresse de départ */}
+            {(routePolyline.length > 0 && routeMode === 'idle' && routeInfo) && (
+              <View style={{ marginTop: 18, backgroundColor: '#fff', borderRadius: 10, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: accentColorLight, shadowColor: accentColor, shadowOpacity: 0.08, shadowRadius: 3 }}>
+                <Text style={{ fontWeight: 'bold', color: accentColor, fontSize: 15 }}>Itinéraire</Text>
+                <Text style={{ fontSize: 13, color: '#444', marginTop: 2 }}>
+                  Arrivée : {routeInfo.legs[0].end_address}
+                </Text>
+                <Text style={{ fontSize: 13, color: '#444', marginTop: 2 }}>
+                  Durée : {routeInfo.legs[0].duration.text.replace('hours', 'h').replace('hour', 'h').replace('mins', 'min').replace('min', 'min')} | Distance : {formatDistance(routeInfo.legs[0].distance.text)}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => { handleValidateRoute(); setDestinationModalVisible(false); }}
+                  style={{ marginTop: 18, backgroundColor: accentColor, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 28, alignSelf: 'center', shadowColor: accentColor, shadowOpacity: 0.10, shadowRadius: 4 }}
+                >
+                  <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Valider le trajet</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </View>
         </TouchableWithoutFeedback>
       </Modal>
       {/* Affichage d'infos et bouton stop navigation */}
       {routeMode === 'navigating' && routeInfo && (
-        <View style={{ position: 'absolute', bottom: 40, left: 24, right: 24, backgroundColor: '#fff', borderRadius: 18, padding: 16, shadowColor: '#000', shadowOpacity: 0.10, shadowRadius: 4, zIndex: 100, alignItems: 'center' }}>
-          <Text style={{ fontWeight: 'bold', fontSize: 16, color: accentColor }}>Navigation</Text>
-          <Text>Durée estimée : {routeInfo.legs[0].duration.text} | Distance : {routeInfo.legs[0].distance.text}</Text>
-          {/* Affichage de l'instruction courante avec icône */}
-          {routeInfo.legs[0].steps && routeInfo.legs[0].steps[currentStepIndex] && (
-            <View style={{ marginTop: 10, marginBottom: 6, alignItems: 'center' }}>
-              <Ionicons name="navigate" size={32} color={accentColor} style={{ marginBottom: 4 }} />
-              <Text style={{ fontSize: 16, color: accentColor, fontWeight: '700', textAlign: 'center' }}>
-                {sanitizeHtml(routeInfo.legs[0].steps[currentStepIndex].html_instructions, { allowedTags: [], allowedAttributes: {} })}
-              </Text>
-              <Text style={{ fontSize: 14, color: '#444', marginTop: 2, textAlign: 'center' }}>
-                {routeInfo.legs[0].steps[currentStepIndex].distance.text} | {routeInfo.legs[0].steps[currentStepIndex].duration.text}
+        <RNAnimated.View
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            alignItems: 'center',
+            zIndex: 101,
+            // Remplace bottom animé par translateY animé
+            bottom: 32, // position de base (tout en bas)
+            transform: [
+              {
+                translateY: navBoxY.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [-48, 0], // -48 = juste au-dessus de la div adresse, 0 = tout en bas
+                })
+              }
+            ],
+            opacity: 1,
+          }}
+        >
+          <View style={{
+            backgroundColor: colorScheme === 'dark' ? '#23242A' : '#fff',
+            borderRadius: 16,
+            paddingVertical: 10,
+            paddingHorizontal: 26,
+            shadowColor: colorScheme === 'dark' ? '#000' : accentColor,
+            shadowOpacity: 0.13,
+            shadowRadius: 8,
+            minWidth: 180,
+            maxWidth: 320,
+            alignItems: 'center',
+            borderWidth: 1,
+            borderColor: colorScheme === 'dark' ? '#333' : '#ececec',
+            flexDirection: 'row',
+            justifyContent: 'center',
+            gap: 12
+          }}>
+            <Ionicons name="navigate" size={22} color={accentColor} style={{ marginRight: 8 }} />
+            <View style={{ alignItems: 'center' }}>
+              <Text style={{ fontWeight: 'bold', fontSize: 15, color: accentColor, marginBottom: 2 }}>Navigation</Text>
+              <Text style={{ fontSize: 14, color: colorScheme === 'dark' ? '#f3f4f6' : '#444', marginBottom: 2 }}>
+                {formatDistance(routeInfo.legs[0].distance.text)}
+                {'  '}|  {routeInfo.legs[0].duration.text.replace('hours', 'h').replace('hour', 'h').replace('mins', 'min').replace('min', 'min')}
               </Text>
             </View>
-          )}
-          <TouchableOpacity onPress={() => { setRouteMode('idle'); setRoutePolyline([]); setRouteInfo(null); setRoutePoints({}); setCurrentStepIndex(0); Speech.stop(); }} style={{ marginTop: 8, alignSelf: 'flex-end', backgroundColor: accentColor, borderRadius: 12, padding: 8 }}>
-            <Text style={{ color: '#fff' }}>Arrêter</Text>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity onPress={() => { setRouteMode('idle'); setRoutePolyline([]); setRouteInfo(null); setRoutePoints({}); setCurrentStepIndex(0); Speech.stop(); }} style={{ marginLeft: 8, backgroundColor: accentColor, borderRadius: 10, padding: 7, alignSelf: 'flex-start' }}>
+              <Ionicons name="close" size={18} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        </RNAnimated.View>
       )}
     </View>
   );

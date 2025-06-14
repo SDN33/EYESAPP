@@ -326,6 +326,7 @@ export default function ExploreMotoScreen() {
           mode="moto"
           nearbyUsers={nearbyUsers}
           userId={user?.id || ""}
+          addressVisible={!!(address && address.trim() !== '')}
         />
         {/* Bouton flottant signalement, discret en haut à gauche */}
         <TouchableOpacity
