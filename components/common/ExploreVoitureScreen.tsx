@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { View, Text, StyleSheet, Dimensions, TouchableOpacity, FlatList, Modal, Linking } from "react-native";
 import Animated, { useSharedValue, withTiming, Easing } from "react-native-reanimated";
 import Svg, { Path, Circle, Defs, LinearGradient, Stop, RadialGradient } from "react-native-svg";
@@ -22,14 +22,17 @@ import { useNearbyUsers } from '../../hooks/useNearbyUsers';
 import { Marker } from 'react-native-maps';
 import { Alert as AlertType } from '../../types/alert';
 import { haversine } from '../../utils/haversine';
+import { MotoSpeedometer } from "./MotoSpeedometer";
+import { Animated as RNAnimated, Easing as RNEasing } from "react-native";
 
 // Clé Google API pour le trafic (web ou mobile)
 const GOOGLE_API_KEY = Constants.expoConfig?.extra?.GOOGLE_API_KEY || "";
 
 // Suppression complète de l'encoche, PanResponder, Animated.Value, etc.
-// Ratio fixe : 0.45 pour le haut, 0.55 pour le bas (identique voiture/moto)
+// Ratio fixe : 0.45 pour le haut
 const HEADER_RATIO = 0.45;
-const MAP_RATIO = 0.55;
+// MAP_RATIO dynamique : s'agrandit si aucune notif véhicule n'est affichée
+let MAP_RATIO = 0.55;
 
 export default function ExploreVoitureScreen() {
   const { hasConsent, acceptConsent } = useConsent();
@@ -45,6 +48,8 @@ export default function ExploreVoitureScreen() {
   const { user } = useAuth();
   const { colorScheme } = useThemeMode();
   const { users: nearbyUsers, loading: loadingNearby } = useNearbyUsers(60, true);
+  // MAP_RATIO dynamique (doit être dans le composant pour accéder aux hooks)
+  MAP_RATIO = (nearbyUsers.length > 0 && location && location.coords) ? 0.55 : 0.85;
 
   const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
   const isSmallScreen = screenWidth < 370 || screenHeight < 700;
@@ -170,6 +175,18 @@ export default function ExploreVoitureScreen() {
     }
   }, [nearbyUsers, loadingNearby]);
 
+  // Animation fluide du ratio de la map
+  const animatedMapRatio = useRef(new RNAnimated.Value((nearbyUsers.length > 0 && location && location.coords) ? 0.55 : 0.85)).current;
+  useEffect(() => {
+    const target = (nearbyUsers.length > 0 && location && location.coords) ? 0.55 : 0.85;
+    RNAnimated.timing(animatedMapRatio, {
+      toValue: target,
+      duration: 500,
+      easing: RNEasing.inOut(RNEasing.cubic),
+      useNativeDriver: false
+    }).start();
+  }, [nearbyUsers.length, location?.coords]);
+
   if (hasConsent === false) {
     return <ConsentModal visible onAccept={acceptConsent} />;
   }
@@ -207,7 +224,7 @@ export default function ExploreVoitureScreen() {
             ]}>Auto</Text>
           </View>
           <View style={styles.speedoWrap}>
-            <ModernSpeedometer speed={speed} speedLimit={speedLimit ?? 0} isOverLimit={isOverLimit} color="#60A5FA" />
+            <MotoSpeedometer speed={speed} speedLimit={speedLimit ?? 0} isOverLimit={isOverLimit} color="#60A5FA" />
           </View>
           <View style={[
             styles.weatherBox,
@@ -313,13 +330,15 @@ export default function ExploreVoitureScreen() {
         )}
       </View>
       {/* Bas : Carte GPS immersive (flex dynamique non animé) */}
-      <View style={{ flex: MAP_RATIO, overflow: "hidden", borderTopLeftRadius: 32, borderTopRightRadius: 32 }}>
+      <RNAnimated.View style={{ flex: animatedMapRatio, overflow: "hidden", borderTopLeftRadius: 32, borderTopRightRadius: 32 }}>
         <MapView
           key={recenterKey}
           color="#60A5FA"
           mode="auto"
           nearbyUsers={nearbyUsers}
           userId={user?.id ?? ""}
+          addressVisible={!!(address && address.trim() !== '')}
+          trafficAlertActive={!!trafficAlert}
         />
         {/* Bouton flottant signalement, discret en haut à gauche (même position que moto) */}
         <TouchableOpacity
@@ -364,7 +383,7 @@ export default function ExploreVoitureScreen() {
             )}
           />
         </View> */}
-      </View>
+      </RNAnimated.View>
       {/* Overlay adresse actuelle en bas, en overlay absolu pour ne pas crop la map */}
       {/* Affichage unique de l'adresse, sans doublon ni version colorée */}
       {address && address.trim() !== '' ? (

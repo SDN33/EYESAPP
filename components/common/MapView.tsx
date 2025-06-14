@@ -60,7 +60,7 @@ function getLightMapStyle(mode: MapMode = 'moto') {
 // Ajout d'un traceur global (hors React)
 const traceRecorder = new TraceRecorder();
 
-export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearbyUsers = [], userId, addressVisible = true }: { color?: string, mode?: MapMode, nearbyUsers?: Array<{ id: string, name: string, lat: number, lng: number, mode?: string }>, userId: string, addressVisible?: boolean }) {
+export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearbyUsers = [], userId, addressVisible = true, trafficAlertActive = false }: { color?: string, mode?: MapMode, nearbyUsers?: Array<{ id: string, name: string, lat: number, lng: number, mode?: string }>, userId: string, addressVisible?: boolean, trafficAlertActive?: boolean }) {
   const { location } = useLocation();
   const lat = location?.coords?.latitude;
   const lon = location?.coords?.longitude;
@@ -88,6 +88,10 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
   // Reconnaissance vocale pour la destination
   const [isListening, setIsListening] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
+  // Ajout des états pour le choix d'itinéraire
+  const [showRouteOptions, setShowRouteOptions] = useState(false);
+  const [routeOptions, setRouteOptions] = useState({ tolls: true, highways: true });
+  const [lastRouteQuery, setLastRouteQuery] = useState<{ start?: { latitude: number, longitude: number }, end?: { latitude: number, longitude: number } } | null>(null);
 
   // Définition des couleurs selon le mode
   const accentColor = mode === 'auto' ? '#2979FF' : '#A259FF';
@@ -213,6 +217,7 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
   // Zoom dynamique lors du croisement d'un autre utilisateur
   useEffect(() => {
     if (!mapRef.current || !nearbyUsers || !userId || !location?.coords) return;
+    if (trafficAlertActive) return; // NE PAS ZOOMER si notif trafic affichée
     const lat = location.coords.latitude;
     const lon = location.coords.longitude;
     let crossing = false;
@@ -227,9 +232,9 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
     if (crossing) {
       mapRef.current.animateCamera({ zoom: 18 }, { duration: 400 });
     } else {
-      mapRef.current.animateCamera({ zoom: 16 }, { duration: 800 });
+      mapRef.current.animateCamera({ zoom: 4 }, { duration: 800 }); // Zoom out continent
     }
-  }, [nearbyUsers, userId, location]);
+  }, [nearbyUsers, userId, location, trafficAlertActive]);
 
   // Mémoïsation des boutons de zoom
   const zoomButtons = React.useMemo(() => [
@@ -247,13 +252,17 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
     }}
   ], [mapRef]);
 
-  // Appel à l'API Google Directions
-  const fetchRoute = async (start: { latitude: number, longitude: number }, end: { latitude: number, longitude: number }, onFail?: () => void) => {
+  // Appel à l'API Google Directions avec options
+  const fetchRoute = async (start: { latitude: number, longitude: number }, end: { latitude: number, longitude: number }, onFail?: () => void, opts = routeOptions, forceIdle = true) => {
     setIsLoadingRoute(true);
     setRouteError(null);
     try {
       const apiKey = process.env.EXPO_PUBLIC_GOOGLE_API_KEY || 'AIzaSyBmVBiIzMDvK9U6Xf3mHCo33KGLXeC8FK0';
-      const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${start.latitude},${start.longitude}&destination=${end.latitude},${end.longitude}&mode=driving&traffic_model=best_guess&departure_time=now&key=${apiKey}`;
+      let avoid = [];
+      if (!opts.tolls) avoid.push('tolls');
+      if (!opts.highways) avoid.push('highways');
+      const avoidParam = avoid.length > 0 ? `&avoid=${avoid.join('|')}` : '';
+      const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${start.latitude},${start.longitude}&destination=${end.latitude},${end.longitude}&mode=driving&traffic_model=best_guess&departure_time=now${avoidParam}&key=${apiKey}`;
       console.log('Directions API URL:', url); // LOG URL
       const response = await fetch(url);
       const data = await response.json();
@@ -262,8 +271,16 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
         const points = decodePolyline(data.routes[0].overview_polyline.points);
         setRoutePolyline(points);
         setRouteInfo(data.routes[0]);
-        setRouteMode('navigating');
-        setDestinationModalVisible(false);
+        // Ne forcer le mode idle que si demandé ET si on n'est pas déjà en navigation
+        if (forceIdle && routeMode !== 'navigating') {
+          setRouteMode('idle');
+          setShowRouteOptions(true);
+        }
+        setLastRouteQuery({ start, end });
+        // Garder la modale ouverte pour montrer les options seulement si pas en navigation
+        if (forceIdle && routeMode !== 'navigating') {
+          setDestinationModalVisible(true);
+        }
       } else {
         setRouteError('Aucun itinéraire trouvé pour cette adresse.');
         if (onFail) onFail();
@@ -391,7 +408,7 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
     setDestinationInput(item.description);
     setAutocompleteResults([]);
     Keyboard.dismiss();
-    setIsLoadingRoute(true);
+    setIsLoadingRoute(true); // Correction ici
     setRouteError(null);
     try {
       const apiKey = process.env.EXPO_PUBLIC_GOOGLE_API_KEY || 'AIzaSyBmVBiIzMDvK9U6Xf3mHCo33KGLXeC8FK0';
@@ -508,36 +525,57 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
     }
   };
 
-  // Fonction pour valider le trajet et démarrer l'enregistrement du tracé
-  const handleValidateRoute = () => {
+  // Fonction pour valider le trajet et démarrer la navigation
+  const handleValidateRoute = (options = routeOptions) => {
+    console.log('[MapView] ✅ Démarrage navigation avec options:', options);
+    console.log('[MapView] ✅ routeInfo avant navigation:', !!routeInfo);
+    console.log('[MapView] ✅ showRouteOptions avant:', showRouteOptions);
     traceRecorder.start();
     setRouteMode('navigating');
+    setDestinationModalVisible(false);
+    setShowRouteOptions(false);
+    console.log('[MapView] ✅ Navigation lancée - mode devrait être navigating');
   };
 
-  // Ajout d'un état pour gérer l'animation de la div navigation
+  // Debug pour vérifier l'état de la navigation
+  useEffect(() => {
+    console.log('[MapView] 🔄 routeMode changed to:', routeMode);
+    console.log('[MapView] 🔄 routeInfo exists:', !!routeInfo);
+    console.log('[MapView] 🔄 showRouteOptions:', showRouteOptions);
+    console.log('[MapView] 🔄 Should show nav bar:', routeMode === 'navigating' && !!routeInfo);
+  }, [routeMode, routeInfo, showRouteOptions]);
+
+  // Gestion des useEffect pour les options d'itinéraire
+  useEffect(() => {
+    console.log('[MapView] 🔄 destinationModalVisible changed to:', destinationModalVisible);
+    if (!destinationModalVisible) {
+      console.log('[MapView] 🔄 Modal fermée - remise à zéro showRouteOptions');
+      setShowRouteOptions(false);
+    }
+  }, [destinationModalVisible]);
+
+  // Recalcul de l'itinéraire quand les options changent (seulement si pas en navigation)
+  useEffect(() => {
+    console.log('[MapView] 🔁 Recalcul useEffect triggered:', {
+      showRouteOptions,
+      routeMode,
+      hasQuery: !!(lastRouteQuery?.start && lastRouteQuery?.end),
+      isLoading: isLoadingRoute
+    });
+    
+    if (showRouteOptions && routeMode !== 'navigating' && lastRouteQuery?.start && lastRouteQuery?.end && !isLoadingRoute) {
+      console.log('[MapView] 🔁 Lancement recalcul itinéraire...');
+      const timer = setTimeout(() => {
+        fetchRoute(lastRouteQuery.start, lastRouteQuery.end, undefined, routeOptions, true);
+      }, 500); // debounce pour éviter trop d'appels
+      return () => clearTimeout(timer);
+    }
+  }, [routeOptions.tolls, routeOptions.highways, showRouteOptions, routeMode]);
+
+  // Ajout d'un Animated.Value pour la position Y de la barre navigation
   const [navBoxY] = useState(new RNAnimated.Value(0));
-  const [addressVisibleState, setAddressVisible] = useState(true); // À adapter selon la logique d'affichage de la div adresse
 
-  // Fonction à appeler quand la div d'adresse disparaît
-  const handleAddressHide = () => {
-    setAddressVisible(false);
-    RNAnimated.timing(navBoxY, {
-      toValue: 1,
-      duration: 350,
-      useNativeDriver: true,
-    }).start();
-  };
-  // Fonction à appeler quand la div d'adresse réapparaît
-  const handleAddressShow = () => {
-    setAddressVisible(true);
-    RNAnimated.timing(navBoxY, {
-      toValue: 0,
-      duration: 350,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  // Ajoute un useEffect pour animer la div navigation selon addressVisible
+  // Animation de la barre navigation selon la prop addressVisible
   useEffect(() => {
     RNAnimated.timing(navBoxY, {
       toValue: addressVisible ? 0 : 1,
@@ -690,14 +728,37 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
       </TouchableOpacity>
       {/* Bouton flottant pour lancer la création d'itinéraire */}
       {routeMode === 'idle' && (
-        <TouchableOpacity
-          style={{ position: 'absolute', bottom: 80, right: 24, backgroundColor: accentColor, borderRadius: 32, padding: 16, shadowColor: accentColor, shadowOpacity: 0.18, shadowRadius: 8, zIndex: 100 }}
-          onPress={() => { setDestinationModalVisible(true); setRouteMode('selecting'); setRoutePoints({}); setRoutePolyline([]); }}
+        <RNAnimated.View
+          style={{
+            position: 'absolute',
+            bottom: 80,
+            right: 24,
+            backgroundColor: accentColor,
+            borderRadius: 32,
+            padding: 16,
+            shadowColor: accentColor,
+            shadowOpacity: 0.18,
+            shadowRadius: 8,
+            zIndex: 100,
+            transform: [
+              {
+                translateY: navBoxY.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, 50], // 50px plus bas quand address non visible
+                })
+              }
+            ],
+            opacity: 1,
+          }}
         >
-          <Ionicons name="navigate" size={28} color="#fff" />
-        </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => { setDestinationModalVisible(true); setRouteMode('selecting'); setRoutePoints({}); setRoutePolyline([]); }}
+          >
+            <Ionicons name="navigate" size={28} color="#fff" />
+          </TouchableOpacity>
+        </RNAnimated.View>
       )}
-      {/* Modal de destination sans micro */}
+      {/* Modal de destination en bas de page */}
       <Modal
         visible={destinationModalVisible}
         transparent
@@ -705,17 +766,59 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
         onRequestClose={() => setDestinationModalVisible(false)}
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' }}>
-          <View style={{ backgroundColor: accentColorBg, borderRadius: 22, padding: 28, width: '88%', alignItems: 'center', shadowColor: accentColor, shadowOpacity: 0.10, shadowRadius: 12 }}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          {/* Overlay clickable pour fermer */}
+          <TouchableOpacity
+            style={{ flex: 1 }}
+            activeOpacity={1}
+            onPress={() => setDestinationModalVisible(false)}
+          />
+          {/* Contenu du modal en bas */}
+          <View style={{ 
+            backgroundColor: colorScheme === 'dark' ? '#1f2937' : '#fff',
+            borderTopLeftRadius: 24, 
+            borderTopRightRadius: 24, 
+            padding: 24,
+            paddingBottom: 40,
+            maxHeight: '85%',
+            shadowColor: '#000',
+            shadowOpacity: 0.15,
+            shadowRadius: 12,
+            elevation: 8
+          }}>
             <TouchableOpacity
               onPress={() => setDestinationModalVisible(false)}
-              style={{ position: 'absolute', top: 12, right: 12, backgroundColor: accentColorLight, borderRadius: 18, padding: 7, zIndex: 10 }}
+              style={{ 
+                position: 'absolute', 
+                top: 16, 
+                right: 16, 
+                backgroundColor: accentColorLight, 
+                borderRadius: 18, 
+                padding: 8, 
+                zIndex: 10 
+              }}
             >
-              <Ionicons name="close" size={22} color={accentColor} />
+              <Ionicons name="close" size={20} color={accentColor} />
             </TouchableOpacity>
-            <Text style={{ fontWeight: 'bold', fontSize: 20, color: accentColor, marginBottom: 14, letterSpacing: 0.5 }}>Où veux-tu aller ?</Text>
+            <Text style={{ 
+              fontWeight: 'bold', 
+              fontSize: 22, 
+              color: accentColor, 
+              marginBottom: 20, 
+              letterSpacing: 0.5,
+              textAlign: 'center' 
+            }}>Où veux-tu aller ?</Text>
             <TextInput
-              style={{ borderWidth: 1.5, borderColor: accentColorLight, borderRadius: 12, padding: 12, width: '100%', marginBottom: 8, fontSize: 17, backgroundColor: '#fff', color: '#222', shadowColor: accentColor, shadowOpacity: 0.04, shadowRadius: 2 }}
+              style={{ 
+                borderWidth: 1.5, 
+                borderColor: accentColorLight, 
+                borderRadius: 12, 
+                padding: 16, 
+                fontSize: 17, 
+                backgroundColor: colorScheme === 'dark' ? '#374151' : '#fff', 
+                color: colorScheme === 'dark' ? '#fff' : '#222',
+                marginBottom: 12
+              }}
               placeholder="Destination..."
               placeholderTextColor={accentColorLight}
               value={destinationInput}
@@ -752,21 +855,66 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
             {isListening && <Text style={{ marginTop: 12, color: accentColor, fontWeight: '500' }}>Parle maintenant…</Text>}
             {voiceError && <Text style={{ marginTop: 12, color: 'red', fontWeight: '500' }}>{voiceError}</Text>}
             {(isLoadingRoute || autocompleteLoading) && <ActivityIndicator style={{ marginTop: 12 }} color={accentColor} />}
-            {/* Affichage du résumé itinéraire, sans répéter l'adresse de départ */}
-            {(routePolyline.length > 0 && routeMode === 'idle' && routeInfo) && (
-              <View style={{ marginTop: 18, backgroundColor: '#fff', borderRadius: 10, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: accentColorLight, shadowColor: accentColor, shadowOpacity: 0.08, shadowRadius: 3 }}>
-                <Text style={{ fontWeight: 'bold', color: accentColor, fontSize: 15 }}>Itinéraire</Text>
-                <Text style={{ fontSize: 13, color: '#444', marginTop: 2 }}>
+            {/* Affichage du résumé itinéraire et options toujours visibles si routeInfo existe et la modale est ouverte */}
+            {(routePolyline.length > 0 && routeInfo && destinationModalVisible) && (
+              <View style={{ 
+                marginTop: 18, 
+                backgroundColor: colorScheme === 'dark' ? '#374151' : '#fff', 
+                borderRadius: 12, 
+                padding: 16,
+                borderWidth: 1, 
+                borderColor: accentColorLight 
+              }}>
+                <Text style={{ fontWeight: 'bold', color: accentColor, fontSize: 16, marginBottom: 8 }}>Itinéraire trouvé</Text>
+                <Text style={{ fontSize: 14, color: colorScheme === 'dark' ? '#d1d5db' : '#666', marginBottom: 2 }}>
                   Arrivée : {routeInfo.legs[0].end_address}
                 </Text>
-                <Text style={{ fontSize: 13, color: '#444', marginTop: 2 }}>
+                <Text style={{ fontSize: 14, color: colorScheme === 'dark' ? '#d1d5db' : '#666', marginBottom: 16 }}>
                   Durée : {routeInfo.legs[0].duration.text.replace('hours', 'h').replace('hour', 'h').replace('mins', 'min').replace('min', 'min')} | Distance : {formatDistance(routeInfo.legs[0].distance.text)}
                 </Text>
-                <TouchableOpacity
-                  onPress={() => { handleValidateRoute(); setDestinationModalVisible(false); }}
-                  style={{ marginTop: 18, backgroundColor: accentColor, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 28, alignSelf: 'center', shadowColor: accentColor, shadowOpacity: 0.10, shadowRadius: 4 }}
+                {/* Options d'itinéraire */}
+                <Text style={{ fontWeight: 'bold', color: accentColor, fontSize: 15, marginBottom: 12 }}>Options d'itinéraire</Text>
+                <TouchableOpacity 
+                  onPress={() => setRouteOptions(o => ({ ...o, tolls: !o.tolls }))} 
+                  style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}
                 >
-                  <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Valider le trajet</Text>
+                  <Ionicons 
+                    name={routeOptions.tolls ? 'checkbox' : 'square-outline'} 
+                    size={22} 
+                    color={accentColor} 
+                    style={{ marginRight: 10 }} 
+                  />
+                  <Text style={{ color: colorScheme === 'dark' ? '#d1d5db' : '#444', fontSize: 15 }}>Autoriser les péages</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  onPress={() => setRouteOptions(o => ({ ...o, highways: !o.highways }))} 
+                  style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}
+                >
+                  <Ionicons 
+                    name={routeOptions.highways ? 'checkbox' : 'square-outline'} 
+                    size={22} 
+                    color={accentColor} 
+                    style={{ marginRight: 10 }} 
+                  />
+                  <Text style={{ color: colorScheme === 'dark' ? '#d1d5db' : '#444', fontSize: 15 }}>Autoriser les autoroutes</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    console.log('[MapView] 🚀 Bouton Démarrer la navigation cliqué');
+                    handleValidateRoute();
+                  }}
+                  style={{ 
+                    backgroundColor: accentColor, 
+                    borderRadius: 12, 
+                    paddingVertical: 14, 
+                    paddingHorizontal: 32, 
+                    alignSelf: 'center',
+                    shadowColor: accentColor, 
+                    shadowOpacity: 0.20, 
+                    shadowRadius: 6 
+                  }}
+                >
+                  <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Démarrer la navigation</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -783,13 +931,12 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
             right: 0,
             alignItems: 'center',
             zIndex: 101,
-            // Remplace bottom animé par translateY animé
-            bottom: 32, // position de base (tout en bas)
+            bottom: 40,
             transform: [
               {
                 translateY: navBoxY.interpolate({
                   inputRange: [0, 1],
-                  outputRange: [-48, 0], // -48 = juste au-dessus de la div adresse, 0 = tout en bas
+                  outputRange: [-32, 0], // -32 = juste au-dessus de la div adresse, 0 = tout en bas
                 })
               }
             ],

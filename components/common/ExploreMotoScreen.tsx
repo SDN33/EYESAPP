@@ -12,7 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { MaterialIcons } from '@expo/vector-icons';
 import { getAddressFromCoords, getSpeedLimitFromCoordsOSM } from "../../utils/roadInfo";
 import { IconSymbol } from "../ui/IconSymbol";
-import { ModernSpeedometer } from "./ExploreVoitureScreen";
+import { MotoSpeedometer } from "./MotoSpeedometer";
 import Constants from 'expo-constants';
 import AnimatedBike from "./AnimatedBike";
 import { supabase } from '../../services/supabase';
@@ -157,7 +157,8 @@ export default function ExploreMotoScreen() {
   // Suppression du système d'encoche et du PanResponder
   // Ratio fixe : 0.45 pour le haut, 0.55 pour le bas (identique voiture/moto)
   const HEADER_RATIO = 0.45;
-  const MAP_RATIO = 0.55;
+  // MAP_RATIO dynamique : s'agrandit si aucune notif véhicule n'est affichée
+  const MAP_RATIO = (nearbyUsers.length > 0 && location && location.coords) ? 0.55 : 0.85;
 
   // Animation shake du badge limite de vitesse
   const shakeAnim = useRef(new RNAnimated.Value(0)).current;
@@ -181,6 +182,18 @@ export default function ExploreMotoScreen() {
     const b = Math.round(255 + (68 - 255) * ratio); // B: 255 -> 68
     badgeColor = `rgb(${r},${g},${b})`;
   }
+
+  // Animation fluide du ratio de la map
+  const animatedMapRatio = useRef(new RNAnimated.Value((nearbyUsers.length > 0 && location && location.coords) ? 0.55 : 0.85)).current;
+  useEffect(() => {
+    const target = (nearbyUsers.length > 0 && location && location.coords) ? 0.55 : 0.85;
+    RNAnimated.timing(animatedMapRatio, {
+      toValue: target,
+      duration: 500,
+      easing: Easing.inOut(Easing.cubic),
+      useNativeDriver: false
+    }).start();
+  }, [nearbyUsers.length, location?.coords]);
 
   if (hasConsent === false) {
     return <ConsentModal visible onAccept={acceptConsent} />;
@@ -219,8 +232,7 @@ export default function ExploreMotoScreen() {
             ]}>Moto</Text>
           </View>
           <View style={styles.speedoWrap}>
-            {/* Utilise le compteur voiture mais en violet */}
-            <ModernSpeedometer speed={speed} speedLimit={speedLimit ?? 0} isOverLimit={isOverLimit} color="#A259FF" />
+            <MotoSpeedometer speed={speed} speedLimit={speedLimit ?? 0} isOverLimit={isOverLimit} color="#A259FF" />
           </View>
           <View style={[
             styles.leanBox,
@@ -319,7 +331,7 @@ export default function ExploreMotoScreen() {
         )}
       </View>
       {/* Bas : Carte GPS immersive (flex dynamique non animé) */}
-      <View style={{ flex: MAP_RATIO, overflow: "hidden", borderTopLeftRadius: 32, borderTopRightRadius: 32 }}>
+      <RNAnimated.View style={{ flex: animatedMapRatio, overflow: "hidden", borderTopLeftRadius: 32, borderTopRightRadius: 32 }}>
         <MapView
           key={recenterKey}
           color="#A259FF"
@@ -327,6 +339,7 @@ export default function ExploreMotoScreen() {
           nearbyUsers={nearbyUsers}
           userId={user?.id || ""}
           addressVisible={!!(address && address.trim() !== '')}
+          trafficAlertActive={!!trafficAlert}
         />
         {/* Bouton flottant signalement, discret en haut à gauche */}
         <TouchableOpacity
@@ -365,7 +378,7 @@ export default function ExploreMotoScreen() {
             </View>
           </View>
         </Modal>
-      </View>
+      </RNAnimated.View>
       {/* Overlay adresse actuelle en bas, en overlay absolu pour ne pas crop la map */}
       {address && address.trim() !== '' ? (
         <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: 12, alignItems: "center", backgroundColor: "#181A20EE", opacity: 0.93, borderTopLeftRadius: 16, borderTopRightRadius: 16, zIndex: 20, shadowColor: '#000', shadowOpacity: 0.10, shadowRadius: 8 }}>
