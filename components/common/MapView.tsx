@@ -504,7 +504,7 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
       hasQuery: !!(lastRouteQuery?.start && lastRouteQuery?.end),
       isLoading: isLoadingRoute
     });
-    
+
     if (showRouteOptions && routeMode !== 'navigating' && lastRouteQuery?.start && lastRouteQuery?.end && !isLoadingRoute) {
       console.log('[MapView] 🔁 Lancement recalcul itinéraire...');
       const timer = setTimeout(() => {
@@ -705,7 +705,7 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
         visible={destinationModalVisible}
         transparent
         animationType="slide"
-        onRequestClose={() => setDestinationModalVisible(false)}
+        onRequestClose={() => { setDestinationModalVisible(false); setRouteMode('idle'); }}
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }}>
@@ -713,7 +713,7 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
           <TouchableOpacity
             style={{ flex: 1 }}
             activeOpacity={1}
-            onPress={() => setDestinationModalVisible(false)}
+            onPress={() => { setDestinationModalVisible(false); setRouteMode('idle'); }}
           />
           {/* Contenu du modal en bas */}
           <View style={{ 
@@ -729,7 +729,7 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
             elevation: 8
           }}>
             <TouchableOpacity
-              onPress={() => setDestinationModalVisible(false)}
+              onPress={() => { setDestinationModalVisible(false); setRouteMode('idle'); }}
               style={{ 
                 position: 'absolute', 
                 top: 16, 
@@ -907,7 +907,7 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
               <Text style={{ fontWeight: 'bold', fontSize: 15, color: accentColor, marginBottom: 2 }}>Navigation</Text>
               <Text style={{ fontSize: 14, color: colorScheme === 'dark' ? '#f3f4f6' : '#444', marginBottom: 2 }}>
                 {formatDistance(routeInfo.legs[0].distance.text)}
-                {'  '}|  {routeInfo.legs[0].duration.text.replace('hours', 'h').replace('hour', 'h').replace('mins', 'min').replace('min', 'min')}
+                {'  '}|  {routeInfo.legs[0].duration.text.replace('hours', 'h').replace('hour', 'h').replace('mins', 'min').replace('min', 'min')}More actions
               </Text>
             </View>
             <TouchableOpacity onPress={() => { setRouteMode('idle'); setRoutePolyline([]); setRouteInfo(null); setRoutePoints({}); setCurrentStepIndex(0); Speech.stop(); }} style={{ marginLeft: 8, backgroundColor: accentColor, borderRadius: 10, padding: 7, alignSelf: 'flex-start' }}>

@@ -29,7 +29,7 @@ const GOOGLE_API_KEY = Constants.expoConfig?.extra?.GOOGLE_API_KEY || "";
 
 export default function ExploreMotoScreen() {
   const { hasConsent, acceptConsent } = useConsent();
-  const { location } = useLocation();
+  const { location } = useLocation('moto');
   const angle = useLeanAngle();
   const speed = location?.coords?.speed ? Math.max(0, Math.round(location.coords.speed * 3.6)) : 0;
   const [speedLimit, setSpeedLimit] = useState<number|null>(null);
@@ -52,7 +52,7 @@ export default function ExploreMotoScreen() {
 
   const { user } = useAuth();
   // Rayon réduit à 60 mètres pour la détection des utilisateurs proches
-  const { users: nearbyUsers, loading: loadingNearby } = useNearbyUsers(60, true);
+  const { users: nearbyUsers, loading: loadingNearby } = useNearbyUsers(60);
 
   useEffect(() => {
     if (location?.coords) {

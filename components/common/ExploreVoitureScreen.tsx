@@ -36,7 +36,7 @@ let MAP_RATIO = 0.55;
 
 export default function ExploreVoitureScreen() {
   const { hasConsent, acceptConsent } = useConsent();
-  const { location } = useLocation();
+  const { location } = useLocation('auto');
   const angle = useLeanAngle();
   const speed = location?.coords?.speed ? Math.max(0, Math.round(location.coords.speed * 3.6)) : 0;
   const [speedLimit, setSpeedLimit] = useState<number|null>(null);
@@ -47,7 +47,7 @@ export default function ExploreVoitureScreen() {
   const [showSosModal, setShowSosModal] = useState(false);
   const { user } = useAuth();
   const { colorScheme } = useThemeMode();
-  const { users: nearbyUsers, loading: loadingNearby } = useNearbyUsers(60, true);
+  const { users: nearbyUsers, loading: loadingNearby } = useNearbyUsers(60);
   // MAP_RATIO dynamique (doit être dans le composant pour accéder aux hooks)
   MAP_RATIO = (nearbyUsers.length > 0 && location && location.coords) ? 0.55 : 0.85;
 
