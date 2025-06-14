@@ -17,6 +17,11 @@ import Voice from '@react-native-voice/voice';
 import { toLatLng } from '../../utils/latLng';
 import { formatDistance } from '../../utils/formatDistance';
 import { TraceRecorder } from '../../utils/traceRecorder';
+import { decodePolyline } from '../../utils/map/polyline';
+import { geocodeAddress } from '../../utils/map/geocode';
+import { fetchRoute } from '../../utils/map/directions';
+import { debounce } from '../../utils/map/debounce';
+import { createFetchAutocomplete } from '../../utils/map/autocomplete';
 
 const DARK_MAP_STYLE = [
   { elementType: 'geometry', stylers: [{ color: '#181A20' }] },
@@ -150,8 +155,8 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
     }
   }, [lat, lon, headingSensor, routeMode]);
 
-  // Ajoute une caméra contrôlée pour garder le marker toujours centré et la vue dynamique
-  const camera = lat && lon ? {
+  // Mémoïsation du calcul de la caméra
+  const camera = React.useMemo(() => lat && lon ? {
     center: { latitude: lat, longitude: lon },
     zoom: 19, // Zoom plus proche
     pitch: 70,
@@ -162,7 +167,7 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
         : (location?.coords?.heading ?? 0);
     })(),
     altitude: 0,
-  } : undefined;
+  } : undefined, [lat, lon, location?.coords?.speed, location?.coords?.heading, headingSensor]);
 
   // Optimisation des Markers : React.memo pour NearbyUserMarker
   const NearbyUserMarker = React.memo(function NearbyUserMarker({ user }: { user: { id: string, name: string, lat: number, lng: number, mode?: string } }) {
@@ -302,61 +307,22 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
     }
   }, [routeMode, lat, lon, fetchRoute]);
 
-  // Décodage polyline Google
-  function decodePolyline(encoded: string) {
-    let points = [];
-    let index = 0, len = encoded.length;
-    let lat = 0, lng = 0;
-    while (index < len) {
-      let b, shift = 0, result = 0;
-      do {
-        b = encoded.charCodeAt(index++) - 63;
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-      let dlat = ((result & 1) ? ~(result >> 1) : (result >> 1));
-      lat += dlat;
-      shift = 0;
-      result = 0;
-      do {
-        b = encoded.charCodeAt(index++) - 63;
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-      let dlng = ((result & 1) ? ~(result >> 1) : (result >> 1));
-      lng += dlng;
-      points.push({ latitude: lat / 1e5, longitude: lng / 1e5 });
-    }
-    return points;
-  }
-
-  // Recherche coordonnées via Google Geocoding
-  const geocodeAddress = async (address: string) => {
-    setIsLoadingRoute(true);
-    try {
-      const apiKey = process.env.EXPO_PUBLIC_GOOGLE_API_KEY || 'AIzaSyBmVBiIzMDvK9U6Xf3mHCo33KGLXeC8FK0';
-      const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`;
-      const response = await fetch(url);
-      const data = await response.json();
-      if (data.results && data.results.length > 0) {
-        const loc = data.results[0].geometry.location;
-        return toLatLng(loc);
-      }
-    } catch (e) {}
-    setIsLoadingRoute(false);
-    return null;
-  };
-
-  // Lancement du calcul d'itinéraire après saisie ou dictée
+  // Lancement du calcul d'itinéraire après saisie ou dictée (utilise utilitaire)
   const handleDestinationSubmit = async () => {
     if (!destinationInput) return;
     setIsLoadingRoute(true);
     setRouteError(null);
     const start = lat && lon ? { latitude: lat, longitude: lon } : null;
-    const dest = await geocodeAddress(destinationInput);
+    const dest = await geocodeAddress(destinationInput, setIsLoadingRoute);
     if (dest && start) {
       setRoutePoints({ start, end: dest });
-      fetchRoute(start, dest, () => setDestinationModalVisible(true));
+      fetchRoute(
+        start,
+        dest,
+        () => setDestinationModalVisible(true),
+        routeOptions,
+        true
+      );
     } else {
       setRouteError('Impossible de trouver la destination ou la position de départ.');
       setDestinationModalVisible(true);
@@ -364,35 +330,11 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
     setIsLoadingRoute(false);
   };
 
-  // Debounce utilitaire simple
-  function debounce<T extends (...args: any[]) => void>(fn: T, delay: number) {
-    let timeout: ReturnType<typeof setTimeout>;
-    return (...args: Parameters<T>) => {
-      clearTimeout(timeout);
-      timeout = setTimeout(() => fn(...args), delay);
-    };
-  }
-
-  // Recherche d'adresses avec Google Places Autocomplete (debounced)
-  const fetchAutocomplete = React.useCallback(debounce(async (input: string) => {
-    setAutocompleteLoading(true);
-    setAutocompleteError(null);
-    try {
-      const apiKey = process.env.EXPO_PUBLIC_GOOGLE_API_KEY || 'AIzaSyBmVBiIzMDvK9U6Xf3mHCo33KGLXeC8FK0';
-      const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&language=fr&key=${apiKey}`;
-      const response = await fetch(url);
-      const data = await response.json();
-      if (data.status !== 'OK') {
-        setAutocompleteError(data.error_message || data.status || 'Erreur API');
-        setAutocompleteResults([]);
-      } else if (data.predictions) setAutocompleteResults(data.predictions);
-      else setAutocompleteResults([]);
-    } catch (e) {
-      setAutocompleteError('Erreur réseau ou API');
-      setAutocompleteResults([]);
-    }
-    setAutocompleteLoading(false);
-  }, 350), []);
+  // Recherche d'adresses avec Google Places Autocomplete (debounced, utilitaire)
+  const fetchAutocomplete = React.useCallback(
+    createFetchAutocomplete(setAutocompleteLoading, setAutocompleteError, setAutocompleteResults),
+    []
+  );
 
   // Sur changement de texte, lancer l'autocomplete (debounced)
   useEffect(() => {
@@ -404,11 +346,11 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
   }, [destinationInput, destinationModalVisible, fetchAutocomplete]);
 
   // Sélection d'une suggestion
-  const handleSelectSuggestion = async (item: any) => {
+  const handleSelectSuggestion = React.useCallback(async (item: any) => {
     setDestinationInput(item.description);
     setAutocompleteResults([]);
     Keyboard.dismiss();
-    setIsLoadingRoute(true); // Correction ici
+    setIsLoadingRoute(true);
     setRouteError(null);
     try {
       const apiKey = process.env.EXPO_PUBLIC_GOOGLE_API_KEY || 'AIzaSyBmVBiIzMDvK9U6Xf3mHCo33KGLXeC8FK0';
@@ -430,7 +372,7 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
       setDestinationModalVisible(true);
     }
     setIsLoadingRoute(false);
-  };
+  }, [lat, lon, fetchRoute]);
 
   // Met à jour l'étape courante selon la position GPS
   useEffect(() => {
