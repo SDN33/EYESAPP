@@ -1,11 +1,52 @@
 // MapView.web.tsx : version web (Google Maps JS API) identique à la version mobile
 import React, { useEffect, useRef, useState } from "react";
 import { useLocation } from "../../hooks/useLocation";
+import { useThemeMode } from '../../hooks/ThemeContext';
 
 const GOOGLE_API_KEY = "AIzaSyBmVBiIzMDvK9U6Xf3mHCo33KGLXeC8FK0";
 
-export default function MapView({ color = "#A259FF" }: { color?: string }) {
+const DARK_MAP_STYLE = [
+  { elementType: 'geometry', stylers: [{ color: '#181A20' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#181A20' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#ddd' }] }, // gris clair pour tous les labels
+  { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: '#23242A' }] },
+  { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#23242A' }] },
+  { featureType: 'poi', elementType: 'labels.text', stylers: [{ visibility: 'off' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#3A3D4D' }] },
+  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#5A5D6D' }] },
+  { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#ddd' }] }, // gris clair pour les noms de rues
+  { featureType: 'road', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+  { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#23242A' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#181A20' }] },
+  { featureType: 'water', elementType: 'labels.text', stylers: [{ visibility: 'off' }] },
+];
+
+export type MapMode = 'moto' | 'auto';
+
+function getLightMapStyle(mode: MapMode = 'moto') {
+  // Couleurs plus douces, routes principales en violet (moto) ou bleu (auto)
+  const mainRoadColor = mode === 'moto' ? '#a78bfa' : '#60a5fa'; // violet doux ou bleu doux
+  const mainRoadStroke = mode === 'moto' ? '#c4b5fd' : '#93c5fd';
+  return [
+    { elementType: 'geometry', stylers: [{ color: '#f6f7fa' }] },
+    { elementType: 'labels.text.stroke', stylers: [{ color: '#fff' }] },
+    { elementType: 'labels.text.fill', stylers: [{ color: '#232650' }] },
+    { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: '#e5e7eb' }] },
+    { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#f3f4f6' }] },
+    { featureType: 'poi', elementType: 'labels.text', stylers: [{ visibility: 'off' }] },
+    { featureType: 'road', elementType: 'geometry', stylers: [{ color: mainRoadColor }] },
+    { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: mainRoadStroke }] },
+    { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#232650' }] },
+    { featureType: 'road', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+    { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#e5e7eb' }] },
+    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#e0e7ef' }] },
+    { featureType: 'water', elementType: 'labels.text', stylers: [{ visibility: 'off' }] },
+  ];
+}
+
+export default function MapView({ color = "#A259FF", mode = 'moto' }: { color?: string, mode?: MapMode }) {
   const { location } = useLocation();
+  const { colorScheme } = useThemeMode();
   const lat = location?.coords?.latitude ?? 48.8584;
   const lon = location?.coords?.longitude ?? 2.2945;
   const mapRef = useRef<HTMLDivElement>(null);
@@ -38,21 +79,7 @@ export default function MapView({ color = "#A259FF" }: { color?: string }) {
         disableDefaultUI: false,
         streetViewControl: false,
         fullscreenControl: false,
-        styles: [
-          { elementType: 'geometry', stylers: [{ color: '#181A20' }] },
-          { elementType: 'labels.text.stroke', stylers: [{ color: '#181A20' }] },
-          { elementType: 'labels.text.fill', stylers: [{ color: '#888' }] },
-          { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: '#23242A' }] },
-          { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#23242A' }] },
-          { featureType: 'poi', elementType: 'labels.text', stylers: [{ visibility: 'off' }] },
-          { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#3A3D4D' }] },
-          { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#5A5D6D' }] },
-          { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#bbb' }] },
-          { featureType: 'road', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
-          { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#23242A' }] },
-          { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#181A20' }] },
-          { featureType: 'water', elementType: 'labels.text', stylers: [{ visibility: 'off' }] },
-        ]
+        styles: colorScheme === 'dark' ? DARK_MAP_STYLE : undefined,
       });
       // Ajout de la couche trafic
       const trafficLayer = new (window as any).google.maps.TrafficLayer();
@@ -80,28 +107,53 @@ export default function MapView({ color = "#A259FF" }: { color?: string }) {
       if (markerRef.current) markerRef.current.setMap(null);
       if (googleMap.current) googleMap.current = null;
     };
-  }, []);
+  // Ajout de colorScheme et mode dans les dépendances pour réinitialiser la carte si le thème ou le mode changent
+  }, [colorScheme]);
 
-  // Mise à jour position utilisateur et recentrage auto/manuel
+  // Applique dynamiquement le style de la carte lors d'un changement de thème
+  useEffect(() => {
+    if (!googleMap.current) return;
+    googleMap.current.setOptions({
+      styles: colorScheme === 'dark' ? DARK_MAP_STYLE : undefined
+    });
+  }, [colorScheme]);
+
+  // Mise à jour position utilisateur, recentrage auto/manuel et rotation du marker selon le heading
   useEffect(() => {
     if (!googleMap.current || !markerRef.current || !location?.coords) return;
     const lat = location.coords.latitude;
     const lon = location.coords.longitude;
     markerRef.current.setPosition({ lat, lng: lon });
-    if (isFollowing) {
-      googleMap.current.setCenter({ lat, lng: lon });
+    // Applique la rotation du marker selon le heading si disponible
+    const heading = location.coords.heading;
+    if (typeof heading === 'number' && !isNaN(heading)) {
+      const icon = markerRef.current.getIcon();
+      markerRef.current.setIcon({
+        ...icon,
+        rotation: heading,
+      });
     }
-  }, [location?.coords?.latitude, location?.coords?.longitude, isFollowing]);
+    if (isFollowing) {
+      if (typeof googleMap.current.panTo === 'function') {
+        googleMap.current.panTo({ lat, lng: lon });
+      } else {
+        googleMap.current.setCenter({ lat, lng: lon });
+      }
+    }
+  }, [location?.coords?.latitude, location?.coords?.longitude, location?.coords?.heading, isFollowing]);
 
-  // Recentrage immédiat si la position devient disponible après le premier rendu
+  // Ne recentre plus automatiquement lors d'un changement de coordonnées
+  // Le recentrage ne s'active que via le bouton ou au tout premier rendu
   useEffect(() => {
     if (!googleMap.current || !location?.coords) return;
-    const lat = location.coords.latitude;
-    const lon = location.coords.longitude;
-    googleMap.current.setCenter({ lat, lng: lon });
-    googleMap.current.setZoom(17);
-    setIsFollowing(true);
-  }, [location?.coords?.latitude, location?.coords?.longitude]);
+    // Ne recentre que si c'est le tout premier rendu (init)
+    if (isFollowing && !initDone) {
+      const lat = location.coords.latitude;
+      const lon = location.coords.longitude;
+      googleMap.current.setCenter({ lat, lng: lon });
+      googleMap.current.setZoom(17);
+    }
+  }, [initDone]);
 
   // Fonction pour recentrer la carte (bouton)
   const handleRecenter = () => {

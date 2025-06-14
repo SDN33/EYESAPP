@@ -1,12 +1,22 @@
-import { useEffect, useState } from "react";
-import { getUser } from "../services/auth";
+import { useEffect, useState } from 'react';
+import { supabase } from '../services/supabase';
+import type { User } from '../types/user';
 
-export function useUserData() {
-  const [user, setUser] = useState<{ id: string; name: string } | null>(null);
+export function useUserData(userId: string) {
+  const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    getUser().then(setUser);
-  }, []);
+    if (!userId) return;
+    supabase
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .single()
+      .then(({ data, error }) => {
+        if (error) console.error(error);
+        setUser(data);
+      });
+  }, [userId]);
 
   return user;
 }

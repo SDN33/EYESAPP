@@ -3,6 +3,5 @@ export type User = {
     name: string;
     isPremium: boolean;
     email?: string;
-    consentGiven?: boolean;
+    consent_given?: boolean;
   };
-  

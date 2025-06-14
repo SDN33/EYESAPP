@@ -2,6 +2,9 @@ import React, { useEffect, useState } from "react";
 import { View, Text, ScrollView, ActivityIndicator, Image, Platform, TouchableOpacity, Linking, Modal, Pressable } from "react-native";
 import sanityClient from "../../services/sanityClient";
 import Constants from "expo-constants";
+import { useColorScheme } from '../../hooks/useColorScheme';
+import { Colors } from '../../constants/Colors';
+import { Ionicons } from '@expo/vector-icons';
 
 type Post = {
   _id: string;
@@ -18,7 +21,9 @@ export default function CommunityScreen() {
   const [error, setError] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
-  const isDark = true; // Remplacez ceci par votre logique de détection du thème
+  const colorScheme = useColorScheme() ?? 'light';
+  const bgColor = Colors[colorScheme].background;
+  const textColor = Colors[colorScheme].text;
 
   useEffect(() => {
     // Utilise un proxy CORS côté web uniquement
@@ -69,236 +74,232 @@ export default function CommunityScreen() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: bgColor }}>
         <ActivityIndicator size="large" color="#10B981" />
       </View>
     );
   }
   if (error) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: bgColor }}>
         <Text style={{ color: "red" }}>{error}</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: isDark ? "#181B2C" : "#fff" }} contentContainerStyle={{ padding: 20 }}>
-      <Text
-        style={{
-          color: isDark ? "#fff" : "#18191F",
-          fontSize: 28,
-          fontWeight: "700",
-          marginBottom: 18,
-          letterSpacing: 0.5,
-          textAlign: "center",
-        }}
-      >
-        Communauté
-      </Text>
-      <Text
-        style={{
-          fontWeight: "bold",
-          fontSize: 18,
-          marginBottom: 14,
-          color: isDark ? "#fff" : "#222",
-          textAlign: "center",
-        }}
-      >
-        Retrouvez notre actualité, mises à jour et plus encore sur la communauté !
-      </Text>
-      {posts.map((post) => {
-        const imageUrl = getSanityImageUrl(post.image);
-        const bodyText = Array.isArray(post.body)
-          ? post.body.map((block: any) => block.children?.map((child: any) => child.text).join(" ")).join(" ")
-          : typeof post.body === "string"
-          ? post.body
-          : JSON.stringify(post.body);
-        const previewText = bodyText.length > 180 ? bodyText.slice(0, 180) + "..." : bodyText;
-        return (
-          <View
-            key={post._id}
+    <ScrollView style={{ flex: 1, backgroundColor: Colors[colorScheme].background, paddingTop: 48 }} contentContainerStyle={{ flexGrow: 1 }}>
+      <View style={{ flex: 1 }}>
+        <View style={{ backgroundColor: Colors[colorScheme].background, paddingTop: 0 }}>
+          <Text
             style={{
-              marginBottom: 32,
-              backgroundColor: "#23242A",
-              borderRadius: 16,
-              padding: 18,
-              shadowColor: "#000",
-              shadowOpacity: 0.08,
-              shadowRadius: 6,
+              color: textColor,
+              fontSize: 22,
+              fontWeight: "700",
+              marginBottom: 10,
+              letterSpacing: 0.2,
+              textAlign: "center",
             }}
           >
-            <Text style={{ fontWeight: "bold", fontSize: 20, color: "#A259FF", marginBottom: 8 }}>{post.title}</Text>
-            {post.publishedAt && (
-              <Text style={{ color: "#aaa", fontSize: 13, marginBottom: 6 }}>
-                {new Date(post.publishedAt).toLocaleDateString()}
-              </Text>
-            )}
-            {/* Affichage image si présente */}
-            {imageUrl && (
-              Platform.OS === "web" ? (
-                <div style={{ display: "flex", justifyContent: "center", marginBottom: 10 }}>
-                  <img
-                    src={imageUrl}
-                    alt={post.title}
-                    style={{ width: 220, height: 120, objectFit: "cover", borderRadius: 12 }}
-                  />
-                </div>
-              ) : (
-                <View style={{ alignItems: "center", marginBottom: 10 }}>
-                  <Image
-                    source={{ uri: imageUrl }}
-                    style={{ width: 220, height: 120, borderRadius: 12, resizeMode: "cover" }}
-                  />
-                </View>
-              )
-            )}
-            <Text style={{ color: "#fff", fontSize: 16, marginBottom: 8 }}>{previewText}</Text>
-            {bodyText.length > 180 && (
-              Platform.OS === "web" ? (
-                <a
-                  href="#"
-                  style={{ color: "#A259FF", fontWeight: "bold", fontSize: 15, textAlign: "center", display: "block", marginTop: 4, textDecoration: "none" }}
-                  onClick={e => {
-                    e.preventDefault();
-                    setSelectedPost(post);
-                    setModalVisible(true);
-                  }}
-                >
-                  Voir plus
-                </a>
-              ) : (
-                <TouchableOpacity
-                  onPress={() => {
-                    setSelectedPost(post);
-                    setModalVisible(true);
-                  }}
-                  style={{ alignSelf: "center" }}
-                >
-                  <Text style={{ color: "#A259FF", fontWeight: "bold", fontSize: 15 }}>Voir plus</Text>
-                </TouchableOpacity>
-              )
-            )}
+            Communauté
+          </Text>
+          <Text
+            style={{
+              fontWeight: "600",
+              fontSize: 15,
+              marginBottom: 18,
+              color: textColor,
+              textAlign: "center",
+            }}
+          >
+            Retrouvez notre actualité, mises à jour et plus encore sur la communauté !
+          </Text>
+          {posts.map((post) => {
+            const imageUrl = getSanityImageUrl(post.image);
+            const bodyText = Array.isArray(post.body)
+              ? post.body.map((block: any) => block.children?.map((child: any) => child.text).join(" ")).join(" ")
+              : typeof post.body === "string"
+              ? post.body
+              : JSON.stringify(post.body);
+            const previewText = bodyText.length > 180 ? bodyText.slice(0, 180) + "..." : bodyText;
+            return (
+              <View
+                key={post._id}
+                style={{
+                  marginBottom: 18,
+                  backgroundColor: colorScheme === 'dark' ? "#232650" : "#f3f4f6",
+                  borderRadius: 8,
+                  padding: 15,
+                  shadowColor: "#000",
+                  shadowOpacity: 0.05,
+                  shadowRadius: 4,
+                  elevation: 1,
+                }}
+              >
+                <Text style={{ fontWeight: "bold", fontSize: 17, color: colorScheme === 'dark' ? "#7c3aed" : "#6366f1", marginBottom: 4 }}>{post.title}</Text>
+                {post.publishedAt && (
+                  <Text style={{ color: "#aaa", fontSize: 12, marginBottom: 4 }}>
+                    {new Date(post.publishedAt).toLocaleDateString()}
+                  </Text>
+                )}
+                {/* Affichage image si présente */}
+                {imageUrl && (
+                  Platform.OS === "web" ? (
+                    <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
+                      <img
+                        src={imageUrl}
+                        alt={post.title}
+                        style={{ width: 180, height: 90, objectFit: "cover", borderRadius: 8 }}
+                      />
+                    </div>
+                  ) : (
+                    <View style={{ alignItems: "center", marginBottom: 8 }}>
+                      <Image
+                        source={{ uri: imageUrl }}
+                        style={{ width: 180, height: 90, borderRadius: 8, resizeMode: "cover" }}
+                      />
+                    </View>
+                  )
+                )}
+                <Text style={{ color: textColor, fontSize: 15, marginBottom: 6 }}>{previewText}</Text>
+                {bodyText.length > 180 && (
+                  Platform.OS === "web" ? (
+                    <a
+                      href="#"
+                      style={{ color: colorScheme === 'dark' ? "#a78bfa" : "#7c3aed", fontWeight: "bold", fontSize: 14, textAlign: "center", display: "block", marginTop: 2, textDecoration: "none" }}
+                      onClick={e => {
+                        e.preventDefault();
+                        setSelectedPost(post);
+                        setModalVisible(true);
+                      }}
+                    >
+                      Voir plus
+                    </a>
+                  ) : (
+                    <TouchableOpacity
+                      onPress={() => {
+                        setSelectedPost(post);
+                        setModalVisible(true);
+                      }}
+                      style={{ alignSelf: "center" }}
+                    >
+                      <Text style={{ color: colorScheme === 'dark' ? "#a78bfa" : "#7c3aed", fontWeight: "bold", fontSize: 14 }}>Voir plus</Text>
+                    </TouchableOpacity>
+                  )
+                )}
+              </View>
+            );
+          })}
+          {posts.length === 0 && (
+            <Text style={{ color: "#aaa", textAlign: "center" }}>
+              Aucun article publié pour le moment.
+            </Text>
+          )}
+          {/* Réseaux sociaux */}
+          <View style={{ marginTop: 24, alignItems: "center" }}>
+            <Text style={{ color: "#aaa", fontWeight: "600", fontSize: 13, marginBottom: 8 }}>
+              Suivez-nous sur les réseaux sociaux
+            </Text>
+            <View style={{ flexDirection: "row", gap: 18, justifyContent: 'center', alignItems: 'center' }}>
+              <TouchableOpacity
+                onPress={() => Linking.openURL("https://instagram.com/motoangles")}
+                accessibilityLabel="Instagram"
+              >
+                <Ionicons name="logo-instagram" size={30} color={colorScheme === 'dark' ? '#fff' : '#7c3aed'} style={{ marginRight: 2 }} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => Linking.openURL("https://facebook.com/motoangles")}
+                accessibilityLabel="Facebook"
+              >
+                <Ionicons name="logo-facebook" size={30} color={colorScheme === 'dark' ? '#fff' : '#7c3aed'} style={{ marginRight: 2 }} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => Linking.openURL("https://twitter.com/motoangles")}
+                accessibilityLabel="X"
+              >
+                <Ionicons name="logo-twitter" size={30} color={colorScheme === 'dark' ? '#fff' : '#7c3aed'} style={{ marginRight: 2 }} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => Linking.openURL("https://youtube.com/@motoangles")}
+                accessibilityLabel="YouTube"
+              >
+                <Ionicons name="logo-youtube" size={30} color={colorScheme === 'dark' ? '#fff' : '#7c3aed'} />
+              </TouchableOpacity>
+            </View>
           </View>
-        );
-      })}
-      {posts.length === 0 && (
-        <Text style={{ color: "#aaa", textAlign: "center" }}>
-          Aucun article publié pour le moment.
-        </Text>
-      )}
-      {/* Réseaux sociaux */}
-      <View style={{ marginTop: 32, alignItems: "center" }}>
-        <Text style={{ color: "#aaa", fontWeight: "bold", fontSize: 16, marginBottom: 10 }}>
-          Suivez-nous sur les réseaux sociaux
-        </Text>
-        <View style={{ flexDirection: "row", gap: 24 }}>
-          <TouchableOpacity
+          {/* Mention support */}
+          <Text
+            style={{
+              fontSize: 11,
+              color: colorScheme === 'dark' ? "#888" : "#999",
+              textAlign: "center",
+              marginTop: 18,
+              marginBottom: 6,
+              textDecorationLine: "underline",
+            }}
             onPress={() => {
-              if (typeof window !== "undefined" && window.open) {
-                window.open("https://instagram.com/motoangles", "_blank");
+              if (Platform.OS === "web") {
+                window.location.href = "mailto:support@motoangles.com";
+              } else {
+                Linking.openURL("mailto:support@motoangles.com");
               }
             }}
-            accessibilityLabel="Instagram"
           >
-            <Image
-              source={{ uri: isDark
-                ? "https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/instagram.svg?color=fff"
-                : "https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/instagram.svg" }}
-              style={{ width: 36, height: 36, marginRight: 8, tintColor: isDark ? "#fff" : undefined }}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => {
-              if (typeof window !== "undefined" && window.open) {
-                window.open("https://facebook.com/motoangles", "_blank");
-              }
-            }}
-            accessibilityLabel="Facebook"
+            Besoin d'aide ? Contactez le support : support@motoangles.com
+          </Text>
+          {/* Modal pour afficher le post entier */}
+          <Modal
+            visible={modalVisible}
+            animationType="slide"
+            transparent={true}
+            onRequestClose={() => setModalVisible(false)}
           >
-            <Image
-              source={{ uri: isDark
-                ? "https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/facebook.svg?color=fff"
-                : "https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/facebook.svg" }}
-              style={{ width: 36, height: 36, tintColor: isDark ? "#fff" : undefined }}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
+            <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" }}>
+              <View style={{ backgroundColor: colorScheme === 'dark' ? "#232650" : "#fff", borderRadius: 12, padding: 18, maxWidth: 340, width: "90%" }}>
+                <Text style={{ fontWeight: "bold", fontSize: 19, color: colorScheme === 'dark' ? "#7c3aed" : "#6366f1", marginBottom: 8, textAlign: "center" }}>{selectedPost?.title}</Text>
+                {selectedPost?.publishedAt && (
+                  <Text style={{ color: "#aaa", fontSize: 12, marginBottom: 6, textAlign: "center" }}>
+                    {new Date(selectedPost.publishedAt).toLocaleDateString()}
+                  </Text>
+                )}
+                {selectedPost?.image && (
+                  Platform.OS === "web" ? (
+                    <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
+                      <img
+                        src={getSanityImageUrl(selectedPost.image)}
+                        alt={selectedPost.title}
+                        style={{ width: 180, height: 90, objectFit: "cover", borderRadius: 8 }}
+                      />
+                    </div>
+                  ) : (
+                    <View style={{ alignItems: "center", marginBottom: 8 }}>
+                      <Image
+                        source={{ uri: getSanityImageUrl(selectedPost.image) }}
+                        style={{ width: 180, height: 90, borderRadius: 8, resizeMode: "cover" }}
+                      />
+                    </View>
+                  )
+                )}
+                <ScrollView style={{ maxHeight: 220, marginBottom: 10 }}>
+                  <Text style={{ color: textColor, fontSize: 15 }}>
+                    {selectedPost && (Array.isArray(selectedPost.body)
+                      ? selectedPost.body.map((block: any) => block.children?.map((child: any) => child.text).join(" ")).join(" ")
+                      : typeof selectedPost.body === "string"
+                      ? selectedPost.body
+                      : JSON.stringify(selectedPost.body))}
+                  </Text>
+                </ScrollView>
+                <Pressable
+                  onPress={() => setModalVisible(false)}
+                  style={{ alignSelf: "center", marginTop: 6, padding: 6 }}
+                >
+                  <Text style={{ color: colorScheme === 'dark' ? "#a78bfa" : "#7c3aed", fontWeight: "bold", fontSize: 14 }}>Fermer</Text>
+                </Pressable>
+              </View>
+            </View>
+          </Modal>
         </View>
       </View>
-      {/* Mention support */}
-      <Text
-        style={{
-          fontSize: 11,
-          color: isDark ? "#888" : "#999",
-          textAlign: "center",
-          marginTop: 28,
-          marginBottom: 8,
-          textDecorationLine: "underline",
-        }}
-        onPress={() => {
-          if (Platform.OS === "web") {
-            window.location.href = "mailto:support@motoangles.com";
-          } else {
-            // Sur mobile, mailto fonctionne aussi
-            Linking.openURL("mailto:support@motoangles.com");
-          }
-        }}
-      >
-        Besoin d'aide ? Contactez le support : support@motoangles.com
-      </Text>
-      {/* Modal pour afficher le post entier */}
-      <Modal
-        visible={modalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" }}>
-          <View style={{ backgroundColor: isDark ? "#23242A" : "#fff", borderRadius: 18, padding: 22, maxWidth: 340, width: "90%" }}>
-            <Text style={{ fontWeight: "bold", fontSize: 22, color: "#A259FF", marginBottom: 10, textAlign: "center" }}>{selectedPost?.title}</Text>
-            {selectedPost?.publishedAt && (
-              <Text style={{ color: "#aaa", fontSize: 13, marginBottom: 8, textAlign: "center" }}>
-                {new Date(selectedPost.publishedAt).toLocaleDateString()}
-              </Text>
-            )}
-            {selectedPost?.image && (
-              Platform.OS === "web" ? (
-                <div style={{ display: "flex", justifyContent: "center", marginBottom: 10 }}>
-                  <img
-                    src={getSanityImageUrl(selectedPost.image)}
-                    alt={selectedPost.title}
-                    style={{ width: 220, height: 120, objectFit: "cover", borderRadius: 12 }}
-                  />
-                </div>
-              ) : (
-                <View style={{ alignItems: "center", marginBottom: 10 }}>
-                  <Image
-                    source={{ uri: getSanityImageUrl(selectedPost.image) }}
-                    style={{ width: 220, height: 120, borderRadius: 12, resizeMode: "cover" }}
-                  />
-                </View>
-              )
-            )}
-            <ScrollView style={{ maxHeight: 260, marginBottom: 16 }}>
-              <Text style={{ color: isDark ? "#fff" : "#222", fontSize: 16 }}>
-                {selectedPost && (Array.isArray(selectedPost.body)
-                  ? selectedPost.body.map((block: any) => block.children?.map((child: any) => child.text).join(" ")).join(" ")
-                  : typeof selectedPost.body === "string"
-                  ? selectedPost.body
-                  : JSON.stringify(selectedPost.body))}
-              </Text>
-            </ScrollView>
-            <Pressable
-              onPress={() => setModalVisible(false)}
-              style={{ alignSelf: "center", marginTop: 8, padding: 8 }}
-            >
-              <Text style={{ color: "#A259FF", fontWeight: "bold", fontSize: 16 }}>Fermer</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
     </ScrollView>
   );
 }

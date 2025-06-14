@@ -2,8 +2,8 @@
 import { useState, useEffect } from 'react';
 import * as Location from 'expo-location';
 
-export function useLocation() {
-  const [location, setLocation] = useState<Location.LocationObject | null>(null);
+export function useLocation(mode: 'moto' | 'auto' = 'moto') {
+  const [location, setLocation] = useState<(Location.LocationObject & { mode: 'moto' | 'auto' }) | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -25,10 +25,11 @@ export function useLocation() {
               speed: pos.coords.speed,
             },
             timestamp: pos.timestamp,
-          } as any);
+            mode,
+          });
         },
         (err) => setError(err.message),
-        { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
       );
       cleanup = () => {
         if (watchId !== null && navigator.geolocation.clearWatch) {
@@ -45,8 +46,8 @@ export function useLocation() {
           return;
         }
         sub = await Location.watchPositionAsync(
-          { accuracy: Location.Accuracy.Highest, timeInterval: 1000, distanceInterval: 1 },
-          (loc) => setLocation(loc)
+          { accuracy: Location.Accuracy.Highest, timeInterval: 250, distanceInterval: 0.5 },
+          (loc) => setLocation({ ...(loc as Location.LocationObject), mode })
         );
       })();
       cleanup = () => {
@@ -54,7 +55,7 @@ export function useLocation() {
       };
     }
     return cleanup;
-  }, []);
+  }, [mode]);
 
   return { location, error };
 }

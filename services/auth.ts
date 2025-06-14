@@ -1,13 +1,24 @@
-import { getItem, setItem, removeItem } from "./storage";
+import { supabase } from './supabase';
 
-const USER_KEY = "userProfile";
-
-export async function getUser(): Promise<{ id: string; name: string } | null> {
-  const value = await getItem(USER_KEY);
-  return value ? JSON.parse(value) : null;
+// Authentification par email/password
+export async function signUpWithEmail(email: string, password: string) {
+  return supabase.auth.signUp({ email, password });
 }
 
-export async function setUser(user: { id: string; name: string } | null) {
-  if (!user) return removeItem(USER_KEY);
-  await setItem(USER_KEY, JSON.stringify(user));
+export async function signInWithEmail(email: string, password: string) {
+  return supabase.auth.signInWithPassword({ email, password });
+}
+
+// Authentification via Google/Apple (OAuth)
+export async function signInWithProvider(provider: 'google' | 'apple') {
+  return supabase.auth.signInWithOAuth({ provider });
+}
+
+export async function signOut() {
+  return supabase.auth.signOut();
+}
+
+export async function getUser() {
+  const { data } = await supabase.auth.getUser();
+  return data.user;
 }

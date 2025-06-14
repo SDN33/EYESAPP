@@ -12,8 +12,9 @@ export function useLeanAngle() {
       const { DeviceMotion } = require('expo-sensors');
       DeviceMotion.setUpdateInterval(200);
       subscription = DeviceMotion.addListener((motion: any) => {
+        // Pour support moto (téléphone monté droit, haut vers le ciel), l'inclinaison gauche/droite = gamma
         const gamma = motion.rotation?.gamma ?? 0;
-        setAngle(Math.round((gamma * 180) / Math.PI));
+        setAngle(-Math.round((gamma * 180) / Math.PI)); // Inversion du signe
       });
       return () => {
         if (subscription) subscription.remove();
@@ -22,7 +23,7 @@ export function useLeanAngle() {
       // Web : DeviceOrientation API
       const handleOrientation = (event: DeviceOrientationEvent) => {
         // gamma = inclinaison gauche/droite, [-90, 90]
-        setAngle(Math.round(event.gamma ?? 0));
+        setAngle(-(Math.round(event.gamma ?? 0))); // Inversion du signe
       };
       window.addEventListener('deviceorientation', handleOrientation);
       return () => {

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, Platform, Dimensions, TouchableOpacity, FlatList, Modal } from "react-native";
+import React, { useState, useEffect, useRef } from "react";
+import { View, Text, StyleSheet, Platform, Dimensions, TouchableOpacity, FlatList, Modal, Linking } from "react-native";
 import Animated, { useSharedValue, withTiming, Easing } from "react-native-reanimated";
 import { useLocation } from "../../hooks/useLocation";
 import { useLeanAngle } from "../../hooks/useLeanAngle";
@@ -9,10 +9,20 @@ import MapView from "./MapView";
 // If you want to use react-native-maps, use:
 // import MapView, { Marker } from "react-native-maps";
 import { Ionicons } from '@expo/vector-icons';
-import { getAddressFromCoords, getSpeedLimitFromCoords } from "../../utils/roadInfo";
+import { MaterialIcons } from '@expo/vector-icons';
+import { getAddressFromCoords, getSpeedLimitFromCoordsOSM } from "../../utils/roadInfo";
 import { IconSymbol } from "../ui/IconSymbol";
-import ExploreVoitureScreen, { ModernSpeedometer } from "./ExploreVoitureScreen";
+import { ModernSpeedometer } from "./ExploreVoitureScreen";
 import Constants from 'expo-constants';
+import AnimatedBike from "./AnimatedBike";
+import { supabase } from '../../services/supabase';
+import { useAuth } from '../../hooks/useAuth';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNearbyUsers } from '../../hooks/useNearbyUsers';
+import { Marker } from 'react-native-maps';
+import { Alert as AlertType } from '../../types/alert';
+import { haversine } from '../../utils/haversine';
+import { Animated as RNAnimated } from "react-native";
 
 // Clé Google API pour le trafic (web ou mobile)
 const GOOGLE_API_KEY = Constants.expoConfig?.extra?.GOOGLE_API_KEY || "";
@@ -38,23 +48,48 @@ export default function ExploreMotoScreen() {
     animatedSpeed.value = withTiming(speed, { duration: 600, easing: Easing.out(Easing.cubic) });
   }, [speed]);
 
+  const [speedLimitDebug, setSpeedLimitDebug] = useState<string | null>(null);
+
+  const { user } = useAuth();
+  // Rayon réduit à 60 mètres pour la détection des utilisateurs proches
+  const { users: nearbyUsers, loading: loadingNearby } = useNearbyUsers(60, true);
+
   useEffect(() => {
     if (location?.coords) {
       setSpeedLimit(null); // Reset à chaque changement de position
+      setSpeedLimitDebug(null); // Reset debug
       // Adresse (ville, rue...)
       getAddressFromCoords(location.coords.latitude, location.coords.longitude)
-        .then(addr => {
-          const { road, city, town, village, suburb } = addr || {};
-          setAddress([road, suburb, city, town, village].filter(Boolean).join(", "));
+        .then(async addr => {
+          const { road, house_number, postcode, suburb, city, town, village, state, country } = addr || {};
+          const addressString = [house_number, road, postcode, suburb, city, town, village, state, country].filter(Boolean).join(", ");
+          setAddress(addressString);
+          // Envoi à Supabase : adresse + position précise
+          if (user?.id && addressString) {
+            await supabase.from('users').update({
+              address: addressString,
+              lat: location.coords.latitude,
+              lng: location.coords.longitude,
+              last_seen_at: new Date().toISOString(),
+              mode: 'moto', // Ajout du mode de tracking
+            }).eq('id', user.id);
+          }
         })
         .catch(() => setAddress(""));
       // Limite de vitesse dynamique
-      getSpeedLimitFromCoords(location.coords.latitude, location.coords.longitude)
+      getSpeedLimitFromCoordsOSM(location.coords.latitude, location.coords.longitude)
         .then(limit => {
-          if (limit && !isNaN(Number(limit))) setSpeedLimit(Number(limit));
-          else setSpeedLimit(null);
+          if (limit === null || limit === undefined) {
+            setSpeedLimit(null);
+          } else if (!isNaN(Number(limit))) {
+            setSpeedLimit(Number(limit));
+          } else {
+            setSpeedLimit(null);
+          }
         })
-        .catch(() => setSpeedLimit(null));
+        .catch(e => {
+          setSpeedLimit(null);
+        });
     }
   }, [location?.coords]);
 
@@ -77,19 +112,6 @@ export default function ExploreMotoScreen() {
 
   const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
   const isSmallScreen = screenWidth < 370 || screenHeight < 700;
-
-  // Mock d'alertes communautaires (à remplacer par backend plus tard)
-  const [alerts, setAlerts] = useState([]); // plus d'alertes sur la carte
-  const [showAlertModal, setShowAlertModal] = useState(false);
-
-  // Ajout d'une alerte (mock, à remplacer par API)
-  const handleAddAlert = (type: string) => {
-    // Désactivé : on ne stocke plus les alertes
-    setShowAlertModal(false);
-  };
-
-  // Affichage d'une notification si une alerte communautaire (danger/bouchon) est proche (< 300m)
-  const nearbyAlert = undefined; // plus de notif communautaire
 
   const [trafficAlert, setTrafficAlert] = useState<string | null>(null);
 
@@ -130,50 +152,114 @@ export default function ExploreMotoScreen() {
     return () => clearInterval(interval);
   }, [location?.coords]);
 
+  const [showSosModal, setShowSosModal] = useState(false);
+
+  // Suppression du système d'encoche et du PanResponder
+  // Ratio fixe : 0.45 pour le haut, 0.55 pour le bas (identique voiture/moto)
+  const HEADER_RATIO = 0.45;
+  const MAP_RATIO = 0.55;
+
+  // Animation shake du badge limite de vitesse
+  const shakeAnim = useRef(new RNAnimated.Value(0)).current;
+  useEffect(() => {
+    if (isOverLimit) {
+      RNAnimated.sequence([
+        RNAnimated.timing(shakeAnim, { toValue: 1, duration: 80, useNativeDriver: true }),
+        RNAnimated.timing(shakeAnim, { toValue: -1, duration: 80, useNativeDriver: true }),
+        RNAnimated.timing(shakeAnim, { toValue: 0, duration: 80, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [isOverLimit]);
+
+  // Couleur dynamique du badge selon le dépassement
+  let badgeColor = "#A259FF";
+  if (typeof speedLimit === 'number' && !isNaN(speedLimit) && speedLimit > 0) {
+    const ratio = Math.max(0, Math.min(1, (speed - speedLimit) / speedLimit));
+    // Interpolation du violet au rouge
+    const r = Math.round(162 + (239 - 162) * ratio); // R: 162 -> 239
+    const g = Math.round(89 + (68 - 89) * ratio);   // G: 89 -> 68
+    const b = Math.round(255 + (68 - 255) * ratio); // B: 255 -> 68
+    badgeColor = `rgb(${r},${g},${b})`;
+  }
+
   if (hasConsent === false) {
     return <ConsentModal visible onAccept={acceptConsent} />;
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#111216" }}>
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: "#111216" }}
+      edges={['left', 'right']}
+    >
       {/* Haut : Compteur moderne + indicateur angle */}
-      <View style={[styles.headerContainer, { flex: 1.25 }, isSmallScreen && { minHeight: 180, paddingTop: 8, paddingBottom: 8 }]}> 
+      <View
+        style={[
+          styles.headerContainer,
+          { flex: HEADER_RATIO, minHeight: 0, paddingTop: 0, marginTop: 0 },
+          isSmallScreen && { minHeight: 0, paddingTop: 0, marginTop: 0, paddingBottom: 8 }
+        ]}
+      >
         <View style={styles.headerGlow} />
-        <View style={[styles.speedAngleRow, isSmallScreen && { marginTop: 12, marginBottom: 4 }] } key="moto-header-row">
+        <View style={[
+          styles.speedAngleRow,
+          { marginTop: 0, marginBottom: 0 },
+          isSmallScreen && { marginTop: 0, marginBottom: 0 }
+        ]} key="moto-header-row">
           {/* Rappel du mode actuel (icône moto + label) */}
-          <View style={[styles.modeBox, isSmallScreen && { paddingVertical: 4, paddingHorizontal: 8, minWidth: 40, marginRight: 8 }] }>
+          <View style={[
+            styles.modeBox,
+            { marginRight: 8, paddingVertical: 8, paddingHorizontal: 12, minWidth: 54 },
+            isSmallScreen && { paddingVertical: 4, paddingHorizontal: 8, minWidth: 40 }
+          ]}>
             <IconSymbol name="motorcycle" size={isSmallScreen ? 20 : 28} color="#A259FF" style={{ marginBottom: 2 }} />
-            <Text style={[styles.modeLabel, isSmallScreen && { fontSize: 12, marginTop: 0 }]}>Moto</Text>
+            <Text style={[
+              styles.modeLabel,
+              { color: "#A259FF", fontWeight: "bold", fontSize: 16, marginTop: 2 },
+              isSmallScreen && { fontSize: 12, marginTop: 0 }
+            ]}>Moto</Text>
           </View>
           <View style={styles.speedoWrap}>
             {/* Utilise le compteur voiture mais en violet */}
             <ModernSpeedometer speed={speed} speedLimit={speedLimit ?? 0} isOverLimit={isOverLimit} color="#A259FF" />
           </View>
-          <View style={[styles.leanBox, isSmallScreen && { paddingVertical: 4, paddingHorizontal: 8, minWidth: 40, marginLeft: 8 }] }>
-            <Ionicons name="sync-circle" size={isSmallScreen ? 20 : 28} color="#A259FF" style={{ marginBottom: 2 }} />
-            <Text style={[styles.leanValue, { color: "#A259FF" }, isSmallScreen && { fontSize: 13 }] }>{Math.abs(angle)}°</Text>
+          <View style={[
+            styles.leanBox,
+            { minWidth: 54, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 12, marginTop: 0 },
+            isSmallScreen && { paddingVertical: 4, paddingHorizontal: 8, minWidth: 40, marginTop: 0, marginLeft: 8, paddingBottom: 4, paddingTop: 4, borderRadius: 10, shadowColor: "#A259FF", shadowOpacity: 0.12, shadowRadius: 6, elevation: 2 }
+          ]}>
+            {/* Icône interactive inclinée selon l'angle (SVG custom) */}
+            <View style={{ width: isSmallScreen ? 32 : 40, height: isSmallScreen ? 32 : 40, alignItems: 'center', justifyContent: 'center' }}>
+              <AnimatedBike lean={-angle} />
+            </View>
+            <Text style={[styles.leanValue, isSmallScreen && { fontSize: 13 }]}>{Math.abs(angle)}°</Text>
             <Text style={[styles.leanLabel, isSmallScreen && { fontSize: 10, marginTop: -2 }]}>Inclinaison</Text>
           </View>
         </View>
-        <View style={[styles.limitsRow, isSmallScreen && { marginBottom: 2, gap: 6 }] }>
-          <View style={[
+        <View style={[
+          styles.limitsRow,
+          { marginBottom: 8, gap: 12 },
+          isSmallScreen && { marginBottom: 2, gap: 6 }
+        ]}>
+          {/* Badge limite de vitesse */}
+          <RNAnimated.View style={[
             styles.limitBadge,
             isOverLimit ? styles.limitBadgeOver : {},
+            { width: 48, height: 48, borderRadius: 24, borderWidth: 3, backgroundColor: '#181A20', borderColor: badgeColor, transform: [{ translateX: shakeAnim.interpolate({ inputRange: [-1, 1], outputRange: [-6, 6] }) }] },
             isSmallScreen && { width: 32, height: 32, borderRadius: 16, borderWidth: 2 }
           ]}>
             <Text style={[
               styles.limitBadgeText,
               isOverLimit ? styles.limitBadgeTextOver : {},
-              { color: isOverLimit ? '#EF4444' : '#A259FF' },
+              { color: badgeColor },
               isSmallScreen && { fontSize: 12 }
             ]}>
               {typeof speedLimit === 'number' && !isNaN(speedLimit) ? speedLimit : '—'}
             </Text>
-          </View>
-          <Text style={[styles.limitLabel, isSmallScreen && { fontSize: 11 }]}>Limite de vitesse</Text>
+          </RNAnimated.View>
+          <Text style={[styles.limitLabel, { fontSize: 16 }, isSmallScreen && { fontSize: 11 }]}>Limite de vitesse</Text>
         </View>
-        {/* Alerte radar moderne et dynamique (véhicule à proximité uniquement) */}
-        {(leftDetected || rightDetected) ? (
+        {/* Notification dynamique véhicule à proximité (infos réelles) */}
+        {(nearbyUsers.length > 0 && location && location.coords) && (
           <View style={{
             marginTop: isSmallScreen ? 6 : 16,
             alignSelf: 'center',
@@ -183,105 +269,106 @@ export default function ExploreMotoScreen() {
             paddingVertical: isSmallScreen ? 8 : 14,
             flexDirection: 'row',
             alignItems: 'center',
-            shadowColor: leftDetected || rightDetected ? '#A259FF' : '#23242A',
+            shadowColor: '#A259FF',
             shadowOpacity: 0.18,
             shadowRadius: 12,
             borderWidth: 1.5,
-            borderColor: leftDetected ? '#EF4444' : rightDetected ? '#EF4444' : '#A259FF',
+            borderColor: '#A259FF',
             gap: isSmallScreen ? 8 : 16,
             minWidth: isSmallScreen ? 180 : 240,
             justifyContent: 'center',
             elevation: 2,
             opacity: 0.97
           }}>
-            <Ionicons name={leftDetected ? 'bicycle' : 'car-sport'} size={isSmallScreen ? 20 : 28} color={leftDetected ? '#EF4444' : '#A259FF'} style={{ marginRight: 8 }} />
+            <Ionicons name={nearbyUsers[0].mode === 'auto' ? 'car' : 'bicycle'} size={isSmallScreen ? 20 : 28} color={nearbyUsers[0].mode === 'auto' ? '#60A5FA' : '#A259FF'} style={{ marginRight: 8 }} />
             <Text style={{
-              color: leftDetected ? '#EF4444' : '#A259FF',
+              color: nearbyUsers[0].mode === 'auto' ? '#60A5FA' : '#A259FF',
               fontWeight: 'bold',
               fontSize: isSmallScreen ? 14 : 18,
               marginRight: 8,
               letterSpacing: 0.5
             }}>
-              {leftDetected ? 'Moto à proximité' : 'Auto à proximité'}
+              {nearbyUsers.length === 1
+                ? (nearbyUsers[0].mode === 'auto' ? 'Voiture à proximité' : 'Moto à proximité')
+                : `${nearbyUsers.filter(u => u.mode === nearbyUsers[0].mode).length} ${nearbyUsers[0].mode === 'auto' ? 'voitures' : 'motos'} à proximité`}
             </Text>
             <View style={{
-              backgroundColor: leftDetected ? '#EF4444' : '#A259FF',
+              backgroundColor: nearbyUsers[0].mode === 'auto' ? '#60A5FA' : '#A259FF',
               borderRadius: 8,
               paddingHorizontal: 10,
               paddingVertical: 4,
               marginLeft: 4
             }}>
-              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: isSmallScreen ? 12 : 14 }}>50 m</Text>
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: isSmallScreen ? 12 : 14 }}>
+                {Math.round(haversine(location.coords.latitude, location.coords.longitude, nearbyUsers[0].lat, nearbyUsers[0].lng))} m
+              </Text>
             </View>
             <Animated.View style={{
               marginLeft: 8,
               width: isSmallScreen ? 10 : 16,
               height: isSmallScreen ? 10 : 16,
               borderRadius: 99,
-              backgroundColor: leftDetected ? '#EF4444' : '#A259FF',
+              backgroundColor: nearbyUsers[0].mode === 'auto' ? '#60A5FA' : '#A259FF',
               opacity: 0.7,
-              transform: [{ scale: leftDetected || rightDetected ? 1.2 : 1 }],
-              shadowColor: leftDetected ? '#EF4444' : '#A259FF',
+              transform: [{ scale: 1.2 }],
+              shadowColor: nearbyUsers[0].mode === 'auto' ? '#60A5FA' : '#A259FF',
               shadowOpacity: 0.5,
               shadowRadius: 8
             }} />
           </View>
-        ) : null}
+        )}
       </View>
-      {/* Bas : Carte GPS immersive (plein écran sous le header) */}
-      <View style={{ flex: 1, overflow: "hidden", borderTopLeftRadius: 32, borderTopRightRadius: 32 }}>
+      {/* Bas : Carte GPS immersive (flex dynamique non animé) */}
+      <View style={{ flex: MAP_RATIO, overflow: "hidden", borderTopLeftRadius: 32, borderTopRightRadius: 32 }}>
         <MapView
           key={recenterKey}
           color="#A259FF"
+          mode="moto"
+          nearbyUsers={nearbyUsers}
+          userId={user?.id || ""}
         />
         {/* Bouton flottant signalement, discret en haut à gauche */}
         <TouchableOpacity
-          style={{ position: 'absolute', top: 58, left: 18, backgroundColor: '#23242A', borderRadius: 18, padding: 8, shadowColor: '#000', shadowOpacity: 0.10, shadowRadius: 4, zIndex: 30, opacity: 0.85 }}
-          onPress={() => setShowAlertModal(true)}
+          style={{ position: 'absolute', top: 58, left: 12, backgroundColor: '#23242A', borderRadius: 18, padding: 8, shadowColor: '#000', shadowOpacity: 0.10, shadowRadius: 4, zIndex: 30, opacity: 0.85 }}
+          onPress={() => setShowSosModal(true)}
         >
           <Ionicons name="alert" size={20} color="#A259FF" />
         </TouchableOpacity>
         {/* Modal choix type d'alerte */}
-        <Modal visible={showAlertModal} transparent animationType="fade">
-          <View style={{ flex:1, backgroundColor:'#0008', justifyContent:'center', alignItems:'center' }}>
-            <View style={{ backgroundColor:'#181A20', borderRadius:18, padding:24, minWidth:220 }}>
-              <Text style={{ color:'#fff', fontWeight:'bold', fontSize:18, marginBottom:12 }}>Signaler…</Text>
-              {/* On retire le signalement radar */}
-              <TouchableOpacity onPress={() => handleAddAlert('danger')} style={{ flexDirection:'row', alignItems:'center', marginBottom:14 }}>
-                <Ionicons name="warning" size={22} color="#F59E42" style={{ marginRight:8 }} />
-                <Text style={{ color:'#fff', fontSize:16 }}>Danger</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => handleAddAlert('bouchon')} style={{ flexDirection:'row', alignItems:'center', marginBottom:6 }}>
-                <Ionicons name="car" size={22} color="#60A5FA" style={{ marginRight:8 }} />
-                <Text style={{ color:'#fff', fontSize:16 }}>Bouchon</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setShowAlertModal(false)} style={{ marginTop:10, alignSelf:'flex-end' }}>
-                <Text style={{ color:'#aaa', fontSize:15 }}>Annuler</Text>
-              </TouchableOpacity>
+        <Modal visible={showSosModal} transparent animationType="fade">
+          <View style={{ flex:1, backgroundColor:'#000B', justifyContent:'center', alignItems:'center' }}>
+            <View style={{ backgroundColor:'#181A20', borderRadius:16, padding:18, minWidth:160, alignItems:'center' }}>
+        <Ionicons name="alert-circle" size={28} color="#EF4444" style={{ marginBottom: 8 }} />
+        <Text style={{ color:'#fff', fontWeight: 'bold', fontSize: 15, marginBottom: 6, textAlign: 'center' }}>
+          Appel d'urgence
+        </Text>
+        <Text style={{ color:'#fff', fontSize: 12, marginBottom: 12, textAlign: 'center' }}>
+          Vous allez appeler le numéro international d'urgence (112).
+          Utilisez cette fonction uniquement en cas de danger réel.
+        </Text>
+        <TouchableOpacity
+          style={{ backgroundColor:'#EF4444', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 18, marginBottom: 6 }}
+          onPress={() => {
+            setShowSosModal(false);
+            setTimeout(() => {
+          // Compose le numéro d'urgence (112)
+          Linking.openURL('tel:112');
+            }, 400);
+          }}
+        >
+          <Text style={{ color:'#fff', fontWeight: 'bold', fontSize: 14 }}>Appeler le 112</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => setShowSosModal(false)} style={{ marginTop: 4 }}>
+          <Text style={{ color:'#aaa', fontSize: 12 }}>Annuler</Text>
+        </TouchableOpacity>
             </View>
           </View>
         </Modal>
-        {/* Liste des alertes à proximité (danger/bouchon uniquement) */}
-        {/* <View style={{ position:'absolute', left:0, right:0, bottom:90, alignItems:'center', zIndex:25 }}>
-          <FlatList
-            data={alerts.filter(a => a.type !== 'radar')}
-            keyExtractor={item => item.id.toString()}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            renderItem={({item}) => (
-              <View style={{ backgroundColor:'#23242A', borderRadius:12, padding:10, marginHorizontal:6, flexDirection:'row', alignItems:'center', minWidth:90 }}>
-                <Ionicons name={item.type==='danger' ? 'warning' : 'car'} size={18} color={item.type==='danger' ? '#F59E42' : '#60A5FA'} style={{ marginRight:6 }} />
-                <Text style={{ color:'#fff', fontSize:14 }}>{item.type.charAt(0).toUpperCase()+item.type.slice(1)}</Text>
-                <Text style={{ color:'#aaa', fontSize:13, marginLeft:8 }}>{item.distance} m</Text>
-              </View>
-            )}
-          />
-        </View> */}
       </View>
-      {/* Affichage adresse actuelle en bas, en overlay absolu pour ne pas crop la map */}
-      {address ? (
-        <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: 12, alignItems: "center", backgroundColor: "#181A20EE", zIndex: 20 }}>
-          <Text style={{ color: "#aaa", fontSize: 14, textAlign: "center", maxWidth: "95%" }} numberOfLines={1} ellipsizeMode="tail">
+      {/* Overlay adresse actuelle en bas, en overlay absolu pour ne pas crop la map */}
+      {address && address.trim() !== '' ? (
+        <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: 12, alignItems: "center", backgroundColor: "#181A20EE", opacity: 0.93, borderTopLeftRadius: 16, borderTopRightRadius: 16, zIndex: 20, shadowColor: '#000', shadowOpacity: 0.10, shadowRadius: 8 }}>
+          <Text style={{ color: '#fff', fontSize: 15, fontWeight: '500', textAlign: 'center' }} numberOfLines={2}>
             {address}
           </Text>
         </View>
@@ -295,7 +382,62 @@ export default function ExploreMotoScreen() {
           </View>
         </View>
       )}
-    </View>
+      {/* SOS Emergency Bubble */}
+      <TouchableOpacity
+        style={{
+          position: 'absolute',
+          top: 18,
+          left: 18,
+          backgroundColor: '#EF4444',
+          borderRadius: 32,
+          width: 40,
+          height: 40,
+          alignItems: 'center',
+          justifyContent: 'center',
+          shadowColor: '#EF4444',
+          shadowOpacity: 0.25,
+          shadowRadius: 10,
+          elevation: 4,
+          zIndex: 100
+        }}
+        onPress={() => setShowSosModal(true)}
+        activeOpacity={0.85}
+        accessibilityLabel="Appeler les secours"
+      >
+        <Ionicons name="call" size={16} color="#fff" />
+        <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 10, marginTop: 2 }}>SOS</Text>
+      </TouchableOpacity>
+      {/* SOS Alert Modal */}
+      <Modal visible={showSosModal} transparent animationType="fade">
+        <View style={{ flex:1, backgroundColor:'#000B', justifyContent:'center', alignItems:'center' }}>
+          <View style={{ backgroundColor:'#181A20', borderRadius:16, padding:18, minWidth:160, alignItems:'center' }}>
+        <Ionicons name="alert-circle" size={28} color="#EF4444" style={{ marginBottom: 8 }} />
+        <Text style={{ color:'#fff', fontWeight: 'bold', fontSize: 15, marginBottom: 6, textAlign: 'center' }}>
+          Appel d'urgence
+        </Text>
+        <Text style={{ color:'#fff', fontSize: 12, marginBottom: 12, textAlign: 'center' }}>
+          Vous allez appeler le numéro international d'urgence (112).
+          Utilisez cette fonction uniquement en cas de danger réel.
+        </Text>
+        <TouchableOpacity
+          style={{ backgroundColor:'#EF4444', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 18, marginBottom: 6 }}
+          onPress={() => {
+            setShowSosModal(false);
+            setTimeout(() => {
+          // Compose le numéro d'urgence (112)
+          Linking.openURL('tel:112');
+            }, 400);
+          }}
+        >
+          <Text style={{ color:'#fff', fontWeight: 'bold', fontSize: 14 }}>Appeler le 112</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => setShowSosModal(false)} style={{ marginTop: 4 }}>
+          <Text style={{ color:'#aaa', fontSize: 12 }}>Annuler</Text>
+        </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
   );
 }
 
@@ -305,6 +447,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#181A20",
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
+    marginTop: -40,
     ...Platform.select({
       web: {
         boxShadow: "0 4px 24px 0 rgba(0,0,0,0.10)",
@@ -333,22 +476,6 @@ const styles = StyleSheet.create({
     marginTop: 32,
     marginBottom: 12,
     zIndex: 2
-  },
-  modeBox: {
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#181A20",
-    borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    marginRight: 18,
-    minWidth: 54,
-  },
-  modeLabel: {
-    color: "#A259FF",
-    fontWeight: "bold",
-    fontSize: 16,
-    marginTop: 2,
   },
   speedoWrap: {},
   leanBox: {
@@ -385,7 +512,7 @@ const styles = StyleSheet.create({
   },
   speedCenter: {
     position: "absolute",
-    top: 38,
+    top: 28, // remonte la vitesse et le km/h de 10px
     left: 0, right: 0,
     alignItems: "center"
   },
@@ -434,6 +561,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 8,
     paddingHorizontal: 12,
+    marginTop: 4,
+
     ...Platform.select({
       web: {
         boxShadow: "0 2px 12px 0 #A259FF1F",
@@ -453,6 +582,34 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   weatherLabel: {
+    color: "#aaa",
+    fontSize: 13,
+    marginTop: -2,
+    textAlign: "center"
+  },
+  modeBox: {
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#181A20",
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+
+    ...Platform.select({
+      web: {
+        boxShadow: "0 2px 12px 0 #A259FF1F",
+      },
+      default: {
+        shadowColor: "#A259FF",
+        shadowOpacity: 0.12,
+        shadowRadius: 6,
+      }
+    }),
+    minWidth: 54,
+  },
+  modeLabel: {
     color: "#aaa",
     fontSize: 13,
     marginTop: -2,

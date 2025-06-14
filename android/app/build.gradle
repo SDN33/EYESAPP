@@ -147,9 +147,19 @@ android {
     }
 }
 
+configurations.all {
+    exclude group: "com.android.support"
+    exclude group: "com.android.support", module: "support-compat"
+    exclude group: "com.android.support", module: "versionedparcelable"
+    exclude group: "com.android.support", module: "animated-vector-drawable"
+    exclude group: "com.android.support", module: "support-vector-drawable"
+}
+
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
-    implementation("com.facebook.react:react-android")
+    implementation("com.facebook.react:react-android") {
+        exclude group: "com.android.support"
+    }
 
     def isGifEnabled = (findProperty('expo.gif.enabled') ?: "") == "true";
     def isWebpEnabled = (findProperty('expo.webp.enabled') ?: "") == "true";

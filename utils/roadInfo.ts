@@ -65,3 +65,37 @@ export async function getSpeedLimitFromCoords(lat: number, lon: number) {
     return null;
   }
 }
+
+// API Overpass (OpenStreetMap) pour la limitation de vitesse (maxspeed)
+export async function getSpeedLimitFromCoordsOSM(lat: number, lon: number) {
+  // Rayon de recherche en mètres
+  const radius = 30;
+  // Requête Overpass pour trouver la voie la plus proche avec maxspeed
+  const query = `
+    [out:json][timeout:10];
+    way(around:${radius},${lat},${lon})[highway][maxspeed];
+    out tags center 1;
+  `;
+  try {
+    const res = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `data=${encodeURIComponent(query)}`,
+    });
+    if (!res.ok) throw new Error('Erreur Overpass API');
+    const data = await res.json();
+    if (data.elements && data.elements.length > 0) {
+      // Prend la première voie trouvée avec maxspeed
+      const maxspeed = data.elements[0].tags?.maxspeed;
+      // Peut être "50", "90", "FR:urban", etc.
+      if (maxspeed && /^\d+$/.test(maxspeed)) {
+        return Number(maxspeed);
+      }
+      // Si maxspeed est un code (FR:urban), retourne null ou gère selon besoin
+      return null;
+    }
+    return null;
+  } catch (e) {
+    return null;
+  }
+}
