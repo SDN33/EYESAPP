@@ -65,7 +65,7 @@ export default function ModeTutorial({ visible, onConfirm, onSelect }: { visible
               <Ionicons name="car" size={selected === 'auto' ? 48 : 36} color={selected === 'auto' ? '#fff' : '#60A5FA'} />
             </TouchableOpacity>
           </View>
-          <Text style={styles.title}>Bienvenue sur MotoAngles</Text>
+          <Text style={styles.title}>Bienvenue sur Eyes</Text>
           <Text style={styles.subtitle}>Choisissez votre mode</Text>
           <Text style={styles.text}>
             Choisissez votre mode pour une expérience adaptée à votre conduite :

@@ -280,14 +280,24 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
     }
   }, [mapRef, lat, lon, headingSensor, location?.coords?.heading]);
 
-  // Timer pour réactiver le recentrage auto après 20s d'inactivité manuelle
+  // Ajout pour gestion du recentrage auto après 10s sans interaction
+  const [lastInteraction, setLastInteraction] = useState(Date.now());
+  // Handler appelé à chaque interaction utilisateur sur la carte
+  const handleUserInteraction = () => {
+    setManualRecenter(true);
+    setLastInteraction(Date.now());
+  };
+
+  // Timer pour recentrer auto après 10s sans interaction
   useEffect(() => {
     if (!manualRecenter) return;
-    const timeout = setTimeout(() => {
-      setManualRecenter(false);
-    }, 20000); // 20 secondes
-    return () => clearTimeout(timeout);
-  }, [manualRecenter]);
+    const interval = setInterval(() => {
+      if (manualRecenter && Date.now() - lastInteraction > 10000) {
+        setManualRecenter(false); // Recentrage auto
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [manualRecenter, lastInteraction]);
 
   // Zoom dynamique lors du croisement d'un autre utilisateur
   useEffect(() => {
@@ -648,8 +658,8 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
         maxZoomLevel={19}
         mapPadding={{ top: 0, right: 0, bottom: 0, left: 0 }}
         showsTraffic={showTraffic}
-        onPanDrag={() => setManualRecenter(true)}
-        onRegionChange={() => setManualRecenter(true)}
+        onPanDrag={handleUserInteraction}
+        onRegionChange={handleUserInteraction}
         camera={manualRecenter ? undefined : camera}
         onPress={handleMapPress}
       >
