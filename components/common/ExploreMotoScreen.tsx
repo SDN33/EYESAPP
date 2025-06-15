@@ -23,6 +23,8 @@ import { Marker } from 'react-native-maps';
 import { Alert as AlertType } from '../../types/alert';
 import { haversine } from '../../utils/haversine';
 import { Animated as RNAnimated } from "react-native";
+import ModeTutorial, { ModeType } from './ModeTutorial';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Clé Google API pour le trafic (web ou mobile)
 const GOOGLE_API_KEY = Constants.expoConfig?.extra?.GOOGLE_API_KEY || "";
@@ -351,62 +353,25 @@ export default function ExploreMotoScreen() {
           addressVisible={!!(address && address.trim() !== '')}
           trafficAlertActive={!!trafficAlert}
         />
-        {/* Bouton flottant signalement, discret en haut à gauche */}
-        <TouchableOpacity
-          style={{ position: 'absolute', top: 58, left: 12, backgroundColor: '#23242A', borderRadius: 18, padding: 8, shadowColor: '#000', shadowOpacity: 0.10, shadowRadius: 4, zIndex: 30, opacity: 0.85 }}
-          onPress={() => setShowSosModal(true)}
-        >
-          <Ionicons name="alert" size={20} color="#A259FF" />
-        </TouchableOpacity>
-        {/* Modal choix type d'alerte */}
-        <Modal visible={showSosModal} transparent animationType="fade">
-          <View style={{ flex:1, backgroundColor:'#000B', justifyContent:'center', alignItems:'center' }}>
-            <View style={{ backgroundColor:'#181A20', borderRadius:16, padding:18, minWidth:160, alignItems:'center' }}>
-        <Ionicons name="alert-circle" size={28} color="#EF4444" style={{ marginBottom: 8 }} />
-        <Text style={{ color:'#fff', fontWeight: 'bold', fontSize: 15, marginBottom: 6, textAlign: 'center' }}>
-          Appel d'urgence
-        </Text>
-        <Text style={{ color:'#fff', fontSize: 12, marginBottom: 12, textAlign: 'center' }}>
-          Vous allez appeler le numéro international d'urgence (112).
-          Utilisez cette fonction uniquement en cas de danger réel.
-        </Text>
-        <TouchableOpacity
-          style={{ backgroundColor:'#EF4444', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 18, marginBottom: 6 }}
-          onPress={() => {
-            setShowSosModal(false);
-            setTimeout(() => {
-          // Compose le numéro d'urgence (112)
-          Linking.openURL('tel:112');
-            }, 400);
-          }}
-        >
-          <Text style={{ color:'#fff', fontWeight: 'bold', fontSize: 14 }}>Appeler le 112</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setShowSosModal(false)} style={{ marginTop: 4 }}>
-          <Text style={{ color:'#aaa', fontSize: 12 }}>Annuler</Text>
-        </TouchableOpacity>
+        {/* Overlay adresse actuelle en bas, en overlay absolu pour ne pas crop la map */}
+        {address && address.trim() !== '' ? (
+          <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: 12, alignItems: "center", backgroundColor: "#181A20EE", opacity: 0.93, borderTopLeftRadius: 16, borderTopRightRadius: 16, zIndex: 20, shadowColor: '#000', shadowOpacity: 0.10, shadowRadius: 8 }}>
+            <Text style={{ color: '#fff', fontSize: 15, fontWeight: '500', textAlign: 'center' }} numberOfLines={2}>
+              {address}
+            </Text>
+          </View>
+        ) : null}
+        {/* Notification trafic en temps réel */}
+        {trafficAlert && (
+          <View style={{ position: 'absolute', top: 18, left: 0, right: 0, alignItems: 'center', zIndex: 50 }}>
+            <View style={{ backgroundColor: '#F59E42', borderRadius: 16, paddingHorizontal: 18, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 8, elevation: 3 }}>
+              <Ionicons name="car" size={22} color="#fff" style={{ marginRight: 10 }} />
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>{trafficAlert}</Text>
             </View>
           </View>
-        </Modal>
+        )}
       </RNAnimated.View>
-      {/* Overlay adresse actuelle en bas, en overlay absolu pour ne pas crop la map */}
-      {address && address.trim() !== '' ? (
-        <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: 12, alignItems: "center", backgroundColor: "#181A20EE", opacity: 0.93, borderTopLeftRadius: 16, borderTopRightRadius: 16, zIndex: 20, shadowColor: '#000', shadowOpacity: 0.10, shadowRadius: 8 }}>
-          <Text style={{ color: '#fff', fontSize: 15, fontWeight: '500', textAlign: 'center' }} numberOfLines={2}>
-            {address}
-          </Text>
-        </View>
-      ) : null}
-      {/* Notification trafic en temps réel */}
-      {trafficAlert && (
-        <View style={{ position: 'absolute', top: 18, left: 0, right: 0, alignItems: 'center', zIndex: 50 }}>
-          <View style={{ backgroundColor: '#F59E42', borderRadius: 16, paddingHorizontal: 18, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 8, elevation: 3 }}>
-            <Ionicons name="car" size={22} color="#fff" style={{ marginRight: 10 }} />
-            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>{trafficAlert}</Text>
-          </View>
-        </View>
-      )}
-      {/* SOS Emergency Bubble */}
+      {/* SOS Emergency Bubble - placé hors de la map, comme ExploreVoitureScreen */}
       <TouchableOpacity
         style={{
           position: 'absolute',
@@ -458,8 +423,8 @@ export default function ExploreMotoScreen() {
         <TouchableOpacity onPress={() => setShowSosModal(false)} style={{ marginTop: 4 }}>
           <Text style={{ color:'#aaa', fontSize: 12 }}>Annuler</Text>
         </TouchableOpacity>
-          </View>
-        </View>
+      </View>
+    </View>
       </Modal>
     </SafeAreaView>
   );

@@ -9,12 +9,14 @@ import { IconSymbol } from "../../components/ui/IconSymbol";
 import { useThemeMode } from '../../hooks/ThemeContext';
 import { Colors } from '../../constants/Colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import ModeTutorial, { ModeType } from '../../components/common/ModeTutorial';
 
 export default function ExploreScreen() {
   const { hasConsent, acceptConsent } = useConsent();
   const [mode, setMode] = useState<"motard" | "voiture">("motard");
   const [fadeAnim] = useState(new Animated.Value(1));
   const { colorScheme } = useThemeMode();
+  const [showTuto, setShowTuto] = useState(false);
 
   // Animation de transition futuriste/minimaliste
   const switchMode = (newMode: "motard" | "voiture") => {
@@ -28,6 +30,34 @@ export default function ExploreScreen() {
     const trackingMode = newMode === 'voiture' ? 'auto' : 'moto';
     AsyncStorage.setItem('tracking_mode', trackingMode).catch(() => {});
   };
+
+  const handleModeTutorialConfirm = async (selectedMode: ModeType) => {
+    setShowTuto(false);
+    await AsyncStorage.setItem('mode_tuto_seen', '1');
+    if (selectedMode === 'auto') {
+      setMode('voiture');
+      AsyncStorage.setItem('tracking_mode', 'auto').catch(() => {});
+    } else {
+      setMode('motard');
+      AsyncStorage.setItem('tracking_mode', 'moto').catch(() => {});
+    }
+  };
+
+  // Pré-chargement du mode dès la sélection dans le tutoriel
+  const handleModeTutorialSelect = (selectedMode: ModeType) => {
+    if (selectedMode === 'auto') {
+      setMode('voiture');
+      AsyncStorage.setItem('tracking_mode', 'auto').catch(() => {});
+    } else {
+      setMode('motard');
+      AsyncStorage.setItem('tracking_mode', 'moto').catch(() => {});
+    }
+  };
+
+  // Affichage du tutoriel à chaque démarrage
+  useEffect(() => {
+    setShowTuto(true);
+  }, []);
 
   if (hasConsent === false) {
     return <ConsentModal visible onAccept={acceptConsent} />;
@@ -54,6 +84,7 @@ export default function ExploreScreen() {
       <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
         {mode === "motard" ? <ExploreMotoScreen /> : <ExploreVoitureScreen />}
       </Animated.View>
+      <ModeTutorial visible={showTuto} onConfirm={handleModeTutorialConfirm} onSelect={handleModeTutorialSelect} />
     </View>
   );
 }
