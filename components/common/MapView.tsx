@@ -917,7 +917,7 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
               <Text style={{ fontWeight: 'bold', fontSize: 15, color: accentColor, marginBottom: 2 }}>Navigation</Text>
               <Text style={{ fontSize: 14, color: colorScheme === 'dark' ? '#f3f4f6' : '#444', marginBottom: 2 }}>
                 {formatDistance(routeInfo.legs[0].distance.text)}
-                {'  '}|  {routeInfo.legs[0].duration.text.replace('hours', 'h').replace('hour', 'h').replace('mins', 'min').replace('min', 'min')}
+                {'  '}|  {routeInfo.legs[0].duration.text.replace('hours', 'h').replace('hour', 'h').replace('mins', 'min')}
               </Text>
             </View>
             <TouchableOpacity onPress={() => { setRouteMode('idle'); setRoutePolyline([]); setRouteInfo(null); setRoutePoints({}); setCurrentStepIndex(0); Speech.stop(); }} style={{ marginLeft: 8, backgroundColor: accentColor, borderRadius: 10, padding: 7, alignSelf: 'flex-start' }}>
