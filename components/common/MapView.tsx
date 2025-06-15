@@ -460,10 +460,16 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
     setIsListening(true);
     setVoiceError(null);
     try {
+      // Stoppe toute session précédente avant de démarrer
+      await Voice.stop();
       await Voice.start('fr-FR');
     } catch (e) {
       setIsListening(false);
-      setVoiceError("Impossible de démarrer la reconnaissance vocale.");
+      if (e && e.message && e.message.includes('permission')) {
+        setVoiceError("Permission micro refusée. Activez le micro dans les réglages de l'app.");
+      } else {
+        setVoiceError("Impossible de démarrer la reconnaissance vocale.");
+      }
     }
   };
 
@@ -529,7 +535,7 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
   return (
     <View style={{ flex: 1, backgroundColor: colorScheme === 'dark' ? '#181A20' : '#f6f7fa' }}>
       <MapView
-        key={colorScheme}
+        // key supprimé pour éviter le remount lors du changement de mode
         ref={mapRef}
         provider={PROVIDER_GOOGLE}
         style={{ flex: 1, borderRadius: 0, overflow: 'hidden', paddingTop: 0, marginTop: 0 }}

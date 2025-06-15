@@ -332,7 +332,6 @@ export default function ExploreVoitureScreen() {
       {/* Bas : Carte GPS immersive (flex dynamique non animé) */}
       <RNAnimated.View style={{ flex: animatedMapRatio, overflow: "hidden", borderTopLeftRadius: 32, borderTopRightRadius: 32 }}>
         <MapView
-          key={recenterKey}
           color="#60A5FA"
           mode="auto"
           nearbyUsers={nearbyUsers}

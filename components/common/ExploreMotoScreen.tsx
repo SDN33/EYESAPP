@@ -333,7 +333,6 @@ export default function ExploreMotoScreen() {
       {/* Bas : Carte GPS immersive (flex dynamique non animé) */}
       <RNAnimated.View style={{ flex: animatedMapRatio, overflow: "hidden", borderTopLeftRadius: 32, borderTopRightRadius: 32 }}>
         <MapView
-          key={recenterKey}
           color="#A259FF"
           mode="moto"
           nearbyUsers={nearbyUsers}
