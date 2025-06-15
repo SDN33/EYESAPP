@@ -2,6 +2,8 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../services/supabase';
 import { useLocation } from './useLocation';
+import { useAuth } from './useAuth';
+import { useUserId } from './useUserId';
 
 export type NearbyUser = {
   id: string;
@@ -20,28 +22,26 @@ export type NearbyUser = {
  */
 export function useNearbyUsers(radius: number = 100, mode: 'moto' | 'auto' = 'moto') {
   const { location } = useLocation(mode);
+  const { user } = useAuth();
+  const myId = useUserId();
   const [users, setUsers] = useState<NearbyUser[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const getOtherUserId = (u: any) => u?.id || u?.user_id || u?.sub || u?.uid || u?.email || 'default';
 
   useEffect(() => {
     if (!location?.coords) return;
     setLoading(true);
     (async () => {
-      let userId = 'me';
-      if (supabase.auth.getUser) {
-        const user = await supabase.auth.getUser();
-        if (user && user.data && user.data.user && user.data.user.id) {
-          userId = user.data.user.id;
-        }
-      }
+      const userId = myId;
       const userData = {
         id: userId,
-        name: 'You (test)',
+        name: userId,
         lat: location.coords.latitude,
         lng: location.coords.longitude,
         last_seen_at: new Date().toISOString(),
         is_active: true,
-        mode: location.mode,
+        mode: mode, // Correction : toujours utiliser le paramètre mode du hook
       };
       await supabase
         .from('users')
@@ -58,10 +58,16 @@ export function useNearbyUsers(radius: number = 100, mode: 'moto' | 'auto' = 'mo
           // Ajout d'un log détaillé pour debug
           console.log('[NearbyUsers][Debug] userId:', userId, 'mode:', mode, 'location:', location.coords, 'data:', data, 'error:', error);
           if (error || !data) return;
-          setUsers(data);
+          // Filtrage : ne garder que les users actifs (moins de 2 min)
+          const now = Date.now();
+          const filtered = data.filter((user: any) => {
+            if (!user.last_seen_at) return false;
+            return new Date(user.last_seen_at).getTime() > now - 2 * 60 * 1000;
+          });
+          setUsers(filtered);
         });
     })();
-  }, [location, radius, mode]);
+  }, [location, radius, mode, user]);
 
   return { users, loading };
 }

@@ -25,6 +25,7 @@ import { haversine } from '../../utils/haversine';
 import { MotoSpeedometer } from "./MotoSpeedometer";
 import { Animated as RNAnimated, Easing as RNEasing } from "react-native";
 import MuteButton from '../ui/MuteButton';
+import { useUserId } from '../../hooks/useUserId';
 
 // Clé Google API pour le trafic (web ou mobile)
 const GOOGLE_API_KEY = Constants.expoConfig?.extra?.GOOGLE_API_KEY || "";
@@ -198,9 +199,18 @@ export default function ExploreVoitureScreen() {
     }).start();
   }, [nearbyUsers.length, location?.coords]);
 
-  // Filtrage des utilisateurs proches par mode courant
-  const sameModeNearby = nearbyUsers.filter(u => u.mode === mode);
-  const totalNearby = nearbyUsers.length;
+  const myId = useUserId();
+  const getOtherUserId = (u: any) => u?.id || u?.user_id || u?.sub || u?.uid || u?.email || u?.name || 'default';
+  // DEBUG : log user et nearbyUsers pour analyse
+  useEffect(() => {
+    console.log('[DEBUG][ExploreVoitureScreen] user:', user);
+    console.log('[DEBUG][ExploreVoitureScreen] myId:', myId);
+    console.log('[DEBUG][ExploreVoitureScreen] nearbyUsers:', nearbyUsers);
+  }, [user, myId, nearbyUsers]);
+  // Filtrage des utilisateurs proches par mode courant et exclusion de soi-même
+  // Pour le test, inclure aussi l'utilisateur courant dans le filtrage
+  const sameModeNearby = nearbyUsers.filter(u => u.mode === mode); // PAS d'exclusion par id pour debug
+  const totalNearby = sameModeNearby.length;
 
   if (hasConsent === false) {
     return <ConsentModal visible onAccept={acceptConsent} />;

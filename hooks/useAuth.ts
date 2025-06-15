@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { signInWithEmail, signUpWithEmail, signInWithProvider, signOut, getUser } from "../services/auth";
+import { useUserIdContext } from '../contexts/UserIdContext';
 
 export function useAuth() {
+  const { anonId } = useUserIdContext();
   const [user, setUserState] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -38,5 +40,5 @@ export function useAuth() {
     setUserState(null);
   };
 
-  return { user, loading, login, signup, loginWithProvider, logout: logoutUser };
+  return { user, loading, login, signup, loginWithProvider, logout: logoutUser, anonId };
 }

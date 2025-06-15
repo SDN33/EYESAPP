@@ -25,6 +25,7 @@ import { haversine } from '../../utils/haversine';
 import { Animated as RNAnimated } from "react-native";
 import ModeTutorial, { ModeType } from './ModeTutorial';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useUserId } from '../../hooks/useUserId';
 
 // Clé Google API pour le trafic (web ou mobile)
 const GOOGLE_API_KEY = Constants.expoConfig?.extra?.GOOGLE_API_KEY || "";
@@ -208,9 +209,9 @@ export default function ExploreMotoScreen() {
     }).start();
   }, [nearbyUsers.length, location?.coords]);
 
-  // Filtrage des utilisateurs proches par mode courant
+  // Filtrage des utilisateurs proches par mode courant (inclut soi-même)
   const sameModeNearby = nearbyUsers.filter(u => u.mode === mode);
-  const totalNearby = nearbyUsers.length;
+  const totalNearby = sameModeNearby.length;
 
   if (hasConsent === false) {
     return <ConsentModal visible onAccept={acceptConsent} />;
@@ -288,7 +289,7 @@ export default function ExploreMotoScreen() {
           <Text style={[styles.limitLabel, { fontSize: 16 }, isSmallScreen && { fontSize: 11 }]}>Limite de vitesse</Text>
         </View>
         {/* Notification dynamique véhicule à proximité (infos réelles) */}
-        {(totalNearby > 0 && location && location.coords) && (
+        {(sameModeNearby.length > 0 && location && location.coords) && (
           <View style={{
             marginTop: isSmallScreen ? 6 : 16,
             alignSelf: 'center',
@@ -317,11 +318,9 @@ export default function ExploreMotoScreen() {
               marginRight: 8,
               letterSpacing: 0.5
             }}>
-              {sameModeNearby.length === 0
-                ? 'Aucun motard à proximité'
-                : sameModeNearby.length === 1
-                  ? '1 moto à proximité'
-                  : `${sameModeNearby.length} motos à proximité`}
+              {sameModeNearby.length === 1
+                ? '1 moto à proximité'
+                : `${sameModeNearby.length} motos à proximité`}
               {totalNearby > sameModeNearby.length &&
                 <Text style={{ color: '#aaa', fontWeight: 'normal', fontSize: isSmallScreen ? 12 : 14 }}>  |  {totalNearby} au total</Text>}
             </Text>

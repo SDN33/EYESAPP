@@ -12,6 +12,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { ThemeProvider as AppThemeProvider, useThemeMode } from '../hooks/ThemeContext';
 import { useAuth } from '../hooks/useAuth';
 import { useLiveUserTracking } from '../hooks/useLiveUserTracking';
+import { UserIdContext } from '../contexts/UserIdContext';
 
 export default function RootLayout() {
   const [loaded] = useFonts({
@@ -84,9 +85,11 @@ export default function RootLayout() {
   }
 
   return (
-    <AppThemeProvider>
-      <ThemeWrapper />
-    </AppThemeProvider>
+    <UserIdContext.Provider value={{ anonId }}>
+      <AppThemeProvider>
+        <ThemeWrapper />
+      </AppThemeProvider>
+    </UserIdContext.Provider>
   );
 }
 

@@ -23,6 +23,9 @@ import { fetchRoute } from '../../utils/map/directions';
 import { debounce } from '../../utils/map/debounce';
 import { createFetchAutocomplete } from '../../utils/map/autocomplete';
 import MapMuteButton from './MapMuteButton';
+import { useAuth } from '../../hooks/useAuth';
+import { getItem, setItem } from '../../services/storage';
+import { useUserId } from '../../hooks/useUserId';
 
 const DARK_MAP_STYLE = [
   { elementType: 'geometry', stylers: [{ color: '#181A20' }] },
@@ -99,6 +102,49 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
   const [routeOptions, setRouteOptions] = useState({ tolls: true, highways: true });
   const [lastRouteQuery, setLastRouteQuery] = useState<{ start?: { latitude: number, longitude: number }, end?: { latitude: number, longitude: number } } | null>(null);
   const [muted, setMuted] = useState(false);
+  const { user } = useAuth();
+  const myId = useUserId();
+
+  // Sauvegarde de l'itinéraire recherché (pour user logué)
+  async function saveRecentItinerary(address: string) {
+    if (!user) return;
+    try {
+      const userId = myId;
+      const key = `recent_itineraries_${userId}`;
+      const existing = await getItem(key);
+      let list = [];
+      if (existing) {
+        list = JSON.parse(existing);
+      }
+      // Ajoute en tête, évite les doublons, limite à 5
+      list = [address, ...list.filter((a: string) => a !== address)].slice(0, 5);
+      await setItem(key, JSON.stringify(list));
+      setRecentItineraries(list);
+    } catch {}
+  }
+
+  // Récupération des itinéraires récents (pour user logué)
+  const [recentItineraries, setRecentItineraries] = useState<string[]>([]);
+  useEffect(() => {
+    async function fetchRecents() {
+      if (!user) return setRecentItineraries([]);
+      const userId = myId;
+      const key = `recent_itineraries_${userId}`;
+      const existing = await getItem(key);
+      if (existing) setRecentItineraries(JSON.parse(existing));
+      else setRecentItineraries([]);
+    }
+    fetchRecents();
+  }, [user, destinationModalVisible]);
+
+  // DEBUG : log user object et clé utilisée
+  useEffect(() => {
+    if (user) {
+      const userId = myId;
+      console.log('[DEBUG][MapView] user:', user);
+      console.log('[DEBUG][MapView] userId utilisé pour stockage:', userId);
+    }
+  }, [user]);
 
   // Définition des couleurs selon le mode
   const accentColor = mode === 'auto' ? '#2979FF' : '#A259FF';
@@ -189,13 +235,31 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
     );
   });
 
-  // Mémoïsation des markers des utilisateurs proches
+  // Marker de l'utilisateur courant (toujours affiché, mode et couleur selon l'écran)
+  const MyMarker = () => lat && lon ? (
+    <Marker
+      coordinate={{ latitude: lat, longitude: lon }}
+      title={user?.name || 'Moi'}
+      description={mode === 'auto' ? 'auto' : 'moto'}
+      pinColor={accentColor}
+      tracksViewChanges={true}
+      zIndex={999}
+    >
+      <Ionicons
+        name={mode === 'auto' ? 'car' : 'bicycle'}
+        size={32}
+        color={accentColor}
+      />
+    </Marker>
+  ) : null;
+
+  // Mémoïsation des markers des utilisateurs proches (hors moi, tous modes)
   const filteredNearbyUsers = React.useMemo(() =>
     nearbyUsers.filter(user => user.id !== userId),
     [nearbyUsers, userId]
   );
   const nearbyUserMarkers = React.useMemo(
-    () => filteredNearbyUsers.map(user => <NearbyUserMarker key={user.id} user={user} />),
+    () => filteredNearbyUsers.map(user => <NearbyUserMarker key={user.id + '-' + user.mode} user={user} />),
     [filteredNearbyUsers]
   );
 
@@ -329,6 +393,8 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
         routeOptions,
         true
       );
+      // Sauvegarde de l'itinéraire récent
+      saveRecentItinerary(destinationInput);
     } else {
       setRouteError('Impossible de trouver la destination ou la position de départ.');
       setDestinationModalVisible(true);
@@ -552,6 +618,11 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
     }
   }, [muted]);
 
+  // Log détaillé pour debug : vérifier la liste des users proches et leur mode
+  useEffect(() => {
+    console.log('[MapView][Debug] nearbyUsers:', nearbyUsers.map(u => ({id: u.id, mode: u.mode, name: u.name})));
+  }, [nearbyUsers]);
+
   return (
     <View style={{ flex: 1, backgroundColor: colorScheme === 'dark' ? '#181A20' : '#f6f7fa' }}>
       <MapView
@@ -582,42 +653,9 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
         camera={manualRecenter ? undefined : camera}
         onPress={handleMapPress}
       >
-        {/* Affiche uniquement un rond coloré pour la position utilisateur en mode auto */}
-        {lat && lon && mode === 'auto' && (
-          <Marker.Animated
-            coordinate={{ latitude: lat, longitude: lon }}
-            anchor={{ x: 0.5, y: 0.5 }}
-            flat
-            tracksViewChanges={false}
-          >
-            <View style={{
-              width: 56,
-              height: 56,
-              borderRadius: 19,
-              backgroundColor: color || '#2979FF',
-              borderWidth: 6,
-              borderColor: '#fff',
-              shadowColor: color || '#2979FF',
-              shadowOpacity: 0.32,
-              shadowRadius: 12,
-              elevation: 8,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-              {/* Carré directionnel */}
-              <View style={{
-                width: 18,
-                height: 18,
-                backgroundColor: '#fff',
-                borderRadius: 4,
-                transform: [{ rotate: `${headingSensor ?? location?.coords?.heading ?? 0}deg` }],
-                borderWidth: 2,
-                borderColor: color || '#2979FF',
-              }} />
-            </View>
-          </Marker.Animated>
-        )}
-        {/* Markers des utilisateurs proches (affiche tout le monde, y compris soi-même, pour le testing) */}
+        {/* Marker de l'utilisateur courant */}
+        {MyMarker()}
+        {/* Markers des utilisateurs proches */}
         {nearbyUserMarkers}
         {/* Affichage de l'itinéraire */}
         {routePolyline.length > 0 && (
@@ -885,6 +923,23 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
                   <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Démarrer la navigation</Text>
                 </TouchableOpacity>
               </View>
+            )}
+            {/* Affichage incitatif ou liste des itinéraires */}
+            {user ? (
+              recentItineraries.length > 0 && (
+                <View style={{ marginTop: 10 }}>
+                  <Text style={{ color: '#888', fontSize: 14, marginBottom: 4, textAlign: 'center' }}>Derniers itinéraires recherchés :</Text>
+                  {recentItineraries.map((it, idx) => (
+                    <TouchableOpacity key={it+idx} onPress={() => setDestinationInput(it)} style={{ paddingVertical: 6 }}>
+                      <Text style={{ color: accentColor, fontSize: 15, textAlign: 'center' }}>{it}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )
+            ) : (
+              <Text style={{ color: '#888', fontSize: 14, marginTop: 10, textAlign: 'center' }}>
+                Connectez-vous pour retrouver vos derniers itinéraires récents et suggestions personnalisées.
+              </Text>
             )}
           </View>
         </View>
