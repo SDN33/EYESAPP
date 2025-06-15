@@ -22,6 +22,7 @@ import { geocodeAddress } from '../../utils/map/geocode';
 import { fetchRoute } from '../../utils/map/directions';
 import { debounce } from '../../utils/map/debounce';
 import { createFetchAutocomplete } from '../../utils/map/autocomplete';
+import MapMuteButton from './MapMuteButton';
 
 const DARK_MAP_STYLE = [
   { elementType: 'geometry', stylers: [{ color: '#181A20' }] },
@@ -97,6 +98,7 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
   const [showRouteOptions, setShowRouteOptions] = useState(false);
   const [routeOptions, setRouteOptions] = useState({ tolls: true, highways: true });
   const [lastRouteQuery, setLastRouteQuery] = useState<{ start?: { latitude: number, longitude: number }, end?: { latitude: number, longitude: number } } | null>(null);
+  const [muted, setMuted] = useState(false);
 
   // Définition des couleurs selon le mode
   const accentColor = mode === 'auto' ? '#2979FF' : '#A259FF';
@@ -214,12 +216,12 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
     }
   }, [mapRef, lat, lon, headingSensor, location?.coords?.heading]);
 
-  // Timer pour réactiver le recentrage auto après 5s d'inactivité manuelle
+  // Timer pour réactiver le recentrage auto après 20s d'inactivité manuelle
   useEffect(() => {
     if (!manualRecenter) return;
     const timeout = setTimeout(() => {
       setManualRecenter(false);
-    }, 8000); // 8  secondes
+    }, 20000); // 20 secondes
     return () => clearTimeout(timeout);
   }, [manualRecenter]);
 
@@ -403,12 +405,20 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
 
   // Parle l'instruction courante à chaque changement d'étape
   useEffect(() => {
-    if (routeMode === 'navigating' && routeInfo && routeInfo.legs && routeInfo.legs[0].steps && routeInfo.legs[0].steps[currentStepIndex]) {
+    if (
+      routeMode === 'navigating' &&
+      routeInfo &&
+      routeInfo.legs &&
+      routeInfo.legs[0].steps &&
+      routeInfo.legs[0].steps[currentStepIndex]
+    ) {
       const step = routeInfo.legs[0].steps[currentStepIndex];
       const instruction = sanitizeHtml(step.html_instructions, { allowedTags: [], allowedAttributes: {} });
-      Speech.speak(instruction, { language: 'fr-FR' });
+      if (!muted) {
+        Speech.speak(instruction, { language: 'fr-FR' });
+      }
     }
-  }, [currentStepIndex, routeMode, routeInfo]);
+  }, [currentStepIndex, routeMode, routeInfo, muted]);
 
   // Recalcul automatique d'itinéraire si l'utilisateur s'écarte trop
   // Throttling du recalcul automatique d'itinéraire
@@ -535,6 +545,12 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
       useNativeDriver: true,
     }).start();
   }, [addressVisible]);
+
+  useEffect(() => {
+    if (muted) {
+      Speech.stop(); // Stoppe immédiatement toute lecture vocale si mute activé
+    }
+  }, [muted]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colorScheme === 'dark' ? '#181A20' : '#f6f7fa' }}>
@@ -925,6 +941,12 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
             </TouchableOpacity>
           </View>
         </RNAnimated.View>
+      )}
+      {/* Boutons overlays en haut à gauche */}
+      {routeMode === 'navigating' && (
+        <View style={{ position: 'absolute', top: 12, left: 62, flexDirection: 'row', alignItems: 'center', zIndex: 30 }}>
+          <MapMuteButton muted={muted} onToggle={() => setMuted(m => !m)} />
+        </View>
       )}
     </View>
   );

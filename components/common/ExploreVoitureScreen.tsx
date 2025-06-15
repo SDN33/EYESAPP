@@ -7,7 +7,7 @@ import ConsentModal from "../../components/common/ConsentModal";
 import { useConsent } from "../../hooks/useConsent";
 import MapView from "./MapView";
 import { Ionicons } from '@expo/vector-icons';
-import { getAddressFromCoords, getSpeedLimitFromCoordsOSM } from "../../utils/roadInfo";
+import { getAddressFromCoords, getSpeedLimitFromCoords, getSpeedLimitFromCoordsOSM } from "../../utils/roadInfo";
 import { getWeatherFromCoords } from "../../services/api";
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useLeanAngle } from "../../hooks/useLeanAngle";
@@ -24,6 +24,7 @@ import { Alert as AlertType } from '../../types/alert';
 import { haversine } from '../../utils/haversine';
 import { MotoSpeedometer } from "./MotoSpeedometer";
 import { Animated as RNAnimated, Easing as RNEasing } from "react-native";
+import MuteButton from '../ui/MuteButton';
 
 // Clé Google API pour le trafic (web ou mobile)
 const GOOGLE_API_KEY = Constants.expoConfig?.extra?.GOOGLE_API_KEY || "";
@@ -40,6 +41,7 @@ export default function ExploreVoitureScreen() {
   const angle = useLeanAngle();
   const speed = location?.coords?.speed ? Math.max(0, Math.round(location.coords.speed * 3.6)) : 0;
   const [speedLimit, setSpeedLimit] = useState<number|null>(null);
+  const [speedLimitDebug, setSpeedLimitDebug] = useState<string | null>(null);
   const [address, setAddress] = useState<string>("");
   const [weather, setWeather] = useState<{ temperature: number, icon: string, description: string } | null>(null);
   const [recenterKey, setRecenterKey] = useState(0);
@@ -61,6 +63,7 @@ export default function ExploreVoitureScreen() {
   useEffect(() => {
     if (location?.coords) {
       setSpeedLimit(null); // Reset à chaque changement de position
+      setSpeedLimitDebug(null); // Reset debug
       // Adresse (ville, rue...)
       getAddressFromCoords(location.coords.latitude, location.coords.longitude)
         .then(async addr => {
@@ -79,20 +82,32 @@ export default function ExploreVoitureScreen() {
           }
         })
         .catch(() => setAddress(""));
-      // Limite de vitesse dynamique
-      getSpeedLimitFromCoordsOSM(location.coords.latitude, location.coords.longitude)
+      // Limite de vitesse dynamique (Google Roads prioritaire, fallback OSM)
+      getSpeedLimitFromCoords(location.coords.latitude, location.coords.longitude)
         .then(limit => {
+          console.log('[ExploreVoitureScreen] Google Roads speedLimit:', limit, 'coords:', location.coords.latitude, location.coords.longitude);
+          setSpeedLimitDebug(`[Google] ${limit}`);
           if (limit === null || limit === undefined) {
-            setSpeedLimit(null);
+            getSpeedLimitFromCoordsOSM(location.coords.latitude, location.coords.longitude)
+              .then(limitOSM => {
+                console.log('[ExploreVoitureScreen] OSM speedLimit:', limitOSM, 'coords:', location.coords.latitude, location.coords.longitude);
+                setSpeedLimitDebug(`[OSM] ${limitOSM}`);
+                if (limitOSM === null || limitOSM === undefined) {
+                  setSpeedLimit(null);
+                } else if (!isNaN(Number(limitOSM))) {
+                  setSpeedLimit(Number(limitOSM));
+                } else {
+                  setSpeedLimit(null);
+                }
+              })
+              .catch((e) => { console.log('[ExploreVoitureScreen] OSM speedLimit ERROR', e, 'coords:', location.coords.latitude, location.coords.longitude); setSpeedLimit(null); });
           } else if (!isNaN(Number(limit))) {
             setSpeedLimit(Number(limit));
           } else {
             setSpeedLimit(null);
           }
         })
-        .catch(e => {
-          setSpeedLimit(null);
-        });
+        .catch((e) => { console.log('[ExploreVoitureScreen] Google Roads speedLimit ERROR', e, 'coords:', location.coords.latitude, location.coords.longitude); setSpeedLimit(null); });
       // Météo locale (ne recharge que si la position a changé)
       const lat = Number(location.coords.latitude.toFixed(3));
       const lon = Number(location.coords.longitude.toFixed(3));
@@ -136,24 +151,19 @@ export default function ExploreVoitureScreen() {
       if (!location?.coords) return;
       try {
         const { latitude, longitude } = location.coords;
-        // Simule un trajet de 1km vers le nord
+        // Trajet de 1km vers le nord
         const destLat = latitude + 0.009;
         const destLon = longitude;
-        let url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${latitude},${longitude}&destinations=${destLat},${destLon}&departure_time=now&key=${GOOGLE_API_KEY}`;
+        let url = `https://maps.googleapis.com/maps/api/directions/json?origin=${latitude},${longitude}&destination=${destLat},${destLon}&departure_time=now&key=${GOOGLE_API_KEY}`;
         if (typeof window !== 'undefined') {
           url = `https://corsproxy.io/?${encodeURIComponent(url)}`;
         }
         const res = await fetch(url);
         const data = await res.json();
-        if (
-          data.rows &&
-          data.rows[0] &&
-          data.rows[0].elements &&
-          data.rows[0].elements[0]
-        ) {
-          const el = data.rows[0].elements[0];
-          const duration = el.duration.value; // en secondes
-          const durationInTraffic = el.duration_in_traffic?.value || duration;
+        if (data.routes && data.routes[0] && data.routes[0].legs && data.routes[0].legs[0]) {
+          const leg = data.routes[0].legs[0];
+          const duration = leg.duration.value; // en secondes
+          const durationInTraffic = leg.duration_in_traffic?.value || duration;
           if (durationInTraffic > duration * 1.5) {
             setTrafficAlert("Trafic dense détecté à proximité");
           } else {
@@ -165,7 +175,7 @@ export default function ExploreVoitureScreen() {
       }
     }
     checkTraffic();
-    interval = setInterval(checkTraffic, 30000);
+    interval = setInterval(checkTraffic, 30000); // toutes les 30s
     return () => clearInterval(interval);
   }, [location?.coords]);
 

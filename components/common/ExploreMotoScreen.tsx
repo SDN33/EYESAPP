@@ -10,7 +10,7 @@ import MapView from "./MapView";
 // import MapView, { Marker } from "react-native-maps";
 import { Ionicons } from '@expo/vector-icons';
 import { MaterialIcons } from '@expo/vector-icons';
-import { getAddressFromCoords, getSpeedLimitFromCoordsOSM } from "../../utils/roadInfo";
+import { getAddressFromCoords, getSpeedLimitFromCoords, getSpeedLimitFromCoordsOSM } from "../../utils/roadInfo";
 import { IconSymbol } from "../ui/IconSymbol";
 import { MotoSpeedometer } from "./MotoSpeedometer";
 import Constants from 'expo-constants';
@@ -79,20 +79,30 @@ export default function ExploreMotoScreen() {
           }
         })
         .catch(() => setAddress(""));
-      // Limite de vitesse dynamique
-      getSpeedLimitFromCoordsOSM(location.coords.latitude, location.coords.longitude)
+      // Limite de vitesse dynamique (Google Roads prioritaire, fallback OSM)
+      getSpeedLimitFromCoords(location.coords.latitude, location.coords.longitude)
         .then(limit => {
+          console.log('[ExploreMotoScreen] Google Roads speedLimit:', limit, 'coords:', location.coords.latitude, location.coords.longitude);
           if (limit === null || limit === undefined) {
-            setSpeedLimit(null);
+            getSpeedLimitFromCoordsOSM(location.coords.latitude, location.coords.longitude)
+              .then(limitOSM => {
+                console.log('[ExploreMotoScreen] OSM speedLimit:', limitOSM, 'coords:', location.coords.latitude, location.coords.longitude);
+                if (limitOSM === null || limitOSM === undefined) {
+                  setSpeedLimit(null);
+                } else if (!isNaN(Number(limitOSM))) {
+                  setSpeedLimit(Number(limitOSM));
+                } else {
+                  setSpeedLimit(null);
+                }
+              })
+              .catch((e) => { console.log('[ExploreMotoScreen] OSM speedLimit ERROR', e, 'coords:', location.coords.latitude, location.coords.longitude); setSpeedLimit(null); });
           } else if (!isNaN(Number(limit))) {
             setSpeedLimit(Number(limit));
           } else {
             setSpeedLimit(null);
           }
         })
-        .catch(e => {
-          setSpeedLimit(null);
-        });
+        .catch((e) => { console.log('[ExploreMotoScreen] Google Roads speedLimit ERROR', e, 'coords:', location.coords.latitude, location.coords.longitude); setSpeedLimit(null); });
     }
   }, [location?.coords]);
 
