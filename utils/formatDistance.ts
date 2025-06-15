@@ -4,7 +4,7 @@
 export function formatDistance(text: string): string {
   if (!text) return '';
   // Si déjà en km, juste remplacer le séparateur
-  if (text.includes('km')) return text.replace('.', ',').replace('km', 'km');
+  if (text.includes('km')) return text.replace('.', ',');
   // Si en miles, convertir
   const match = text.match(/([\d.,]+)\s?mi/);
   if (match) {
