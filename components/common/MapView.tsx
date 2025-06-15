@@ -3,7 +3,7 @@ import React, { useRef, useState, useEffect } from "react";
 import sanitizeHtml from "sanitize-html";
 import { View, TouchableOpacity, Platform, StatusBar, Text, Pressable, Animated as RNAnimated, FlatList, TouchableWithoutFeedback, Keyboard } from "react-native";
 import { useLocation } from "../../hooks/useLocation";
-import MapView, { Marker, PROVIDER_GOOGLE, Polyline } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_GOOGLE, Polyline, Circle } from 'react-native-maps';
 import Svg, { Polygon } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeMode } from '../../hooks/ThemeContext';
@@ -237,20 +237,32 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
 
   // Marker de l'utilisateur courant (toujours affiché, mode et couleur selon l'écran)
   const MyMarker = () => lat && lon ? (
-    <Marker
-      coordinate={{ latitude: lat, longitude: lon }}
-      title={user?.name || 'Moi'}
-      description={mode === 'auto' ? 'auto' : 'moto'}
-      pinColor={accentColor}
-      tracksViewChanges={true}
-      zIndex={999}
-    >
-      <Ionicons
-        name={mode === 'auto' ? 'car' : 'bicycle'}
-        size={32}
-        color={accentColor}
-      />
-    </Marker>
+    <>
+      {/* Cercle de précision GPS */}
+      {location?.coords?.accuracy && (
+        <Circle
+          center={{ latitude: lat, longitude: lon }}
+          radius={location.coords.accuracy}
+          strokeColor={accentColor}
+          fillColor={accentColor + '33'} // Opacité 20%
+          zIndex={998}
+        />
+      )}
+      <Marker
+        coordinate={{ latitude: lat, longitude: lon }}
+        title={user?.name || 'Moi'}
+        description={mode === 'auto' ? 'auto' : 'moto'}
+        pinColor={accentColor}
+        tracksViewChanges={true}
+        zIndex={999}
+      >
+        <Ionicons
+          name={mode === 'auto' ? 'car' : 'bicycle'}
+          size={32}
+          color={accentColor}
+        />
+      </Marker>
+    </>
   ) : null;
 
   // Mémoïsation des markers des utilisateurs proches (hors moi, tous modes)

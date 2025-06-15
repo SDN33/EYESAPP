@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { View, Text, StyleSheet, Platform, Dimensions, TouchableOpacity, FlatList, Modal, Linking } from "react-native";
+import { View, Text, StyleSheet, Platform, Dimensions, TouchableOpacity, FlatList, Modal, Linking, Vibration } from "react-native";
 import Animated, { useSharedValue, withTiming, Easing } from "react-native-reanimated";
 import { useLocation } from "../../hooks/useLocation";
 import { useLeanAngle } from "../../hooks/useLeanAngle";
@@ -213,6 +213,26 @@ export default function ExploreMotoScreen() {
   const sameModeNearby = nearbyUsers.filter(u => u.mode === mode);
   const totalNearby = sameModeNearby.length;
 
+  // Animation et vibration à l'apparition/disparition d'un usager proche
+  const [showProximity, setShowProximity] = useState(false);
+  const proximityAnim = useRef(new RNAnimated.Value(0)).current;
+  // Calcul direction (azimut) vers l'usager le plus proche
+  let directionDeg = null;
+  if (sameModeNearby[0] && location?.coords) {
+    const dLat = sameModeNearby[0].lat - location.coords.latitude;
+    const dLng = sameModeNearby[0].lng - location.coords.longitude;
+    directionDeg = Math.atan2(dLng, dLat) * 180 / Math.PI;
+  }
+  useEffect(() => {
+    if (totalNearby > 0) {
+      setShowProximity(true);
+      RNAnimated.spring(proximityAnim, { toValue: 1, useNativeDriver: true }).start();
+      Vibration.vibrate(80);
+    } else {
+      RNAnimated.timing(proximityAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(() => setShowProximity(false));
+    }
+  }, [totalNearby]);
+
   if (hasConsent === false) {
     return <ConsentModal visible onAccept={acceptConsent} />;
   }
@@ -289,8 +309,8 @@ export default function ExploreMotoScreen() {
           <Text style={[styles.limitLabel, { fontSize: 16 }, isSmallScreen && { fontSize: 11 }]}>Limite de vitesse</Text>
         </View>
         {/* Notification dynamique véhicule à proximité (infos réelles) */}
-        {(sameModeNearby.length > 0 && location && location.coords) && (
-          <View style={{
+        {showProximity && location && location.coords && (
+          <RNAnimated.View style={{
             marginTop: isSmallScreen ? 6 : 16,
             alignSelf: 'center',
             backgroundColor: '#23242A',
@@ -308,7 +328,8 @@ export default function ExploreMotoScreen() {
             minWidth: isSmallScreen ? 180 : 240,
             justifyContent: 'center',
             elevation: 2,
-            opacity: 0.97
+            opacity: 0.97,
+            transform: [{ scale: proximityAnim }],
           }}>
             <Ionicons name={'bicycle'} size={isSmallScreen ? 20 : 28} color={'#A259FF'} style={{ marginRight: 8 }} />
             <Text style={{
@@ -318,9 +339,11 @@ export default function ExploreMotoScreen() {
               marginRight: 8,
               letterSpacing: 0.5
             }}>
-              {sameModeNearby.length === 1
-                ? '1 moto à proximité'
-                : `${sameModeNearby.length} motos à proximité`}
+              {sameModeNearby.length === 0
+                ? 'Aucune moto à proximité'
+                : sameModeNearby.length === 1
+                  ? '1 moto à proximité'
+                  : `${sameModeNearby.length} motos à proximité`}
               {totalNearby > sameModeNearby.length &&
                 <Text style={{ color: '#aaa', fontWeight: 'normal', fontSize: isSmallScreen ? 12 : 14 }}>  |  {totalNearby} au total</Text>}
             </Text>
@@ -330,8 +353,15 @@ export default function ExploreMotoScreen() {
                 borderRadius: 8,
                 paddingHorizontal: 10,
                 paddingVertical: 4,
-                marginLeft: 4
+                marginLeft: 4,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6
               }}>
+                {/* Flèche directionnelle */}
+                {directionDeg !== null && (
+                  <Ionicons name="arrow-up" size={isSmallScreen ? 14 : 18} color="#fff" style={{ transform: [{ rotate: `${directionDeg}deg` }] }} />
+                )}
                 <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: isSmallScreen ? 12 : 14 }}>
                   {Math.round(haversine(location.coords.latitude, location.coords.longitude, sameModeNearby[0].lat, sameModeNearby[0].lng))} m
                 </Text>
@@ -349,7 +379,7 @@ export default function ExploreMotoScreen() {
               shadowOpacity: 0.5,
               shadowRadius: 8
             }} />
-          </View>
+          </RNAnimated.View>
         )}
       </View>
       {/* Bas : Carte GPS immersive (flex dynamique non animé) */}
