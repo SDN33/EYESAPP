@@ -188,9 +188,13 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
   });
 
   // Mémoïsation des markers des utilisateurs proches
+  const filteredNearbyUsers = React.useMemo(() =>
+    nearbyUsers.filter(user => user.id !== userId),
+    [nearbyUsers, userId]
+  );
   const nearbyUserMarkers = React.useMemo(
-    () => nearbyUsers.map(user => <NearbyUserMarker key={user.id} user={user} />),
-    [nearbyUsers]
+    () => filteredNearbyUsers.map(user => <NearbyUserMarker key={user.id} user={user} />),
+    [filteredNearbyUsers]
   );
 
   // Bouton de recentrage manuel
@@ -913,7 +917,7 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
               <Text style={{ fontWeight: 'bold', fontSize: 15, color: accentColor, marginBottom: 2 }}>Navigation</Text>
               <Text style={{ fontSize: 14, color: colorScheme === 'dark' ? '#f3f4f6' : '#444', marginBottom: 2 }}>
                 {formatDistance(routeInfo.legs[0].distance.text)}
-                {'  '}|  {routeInfo.legs[0].duration.text.replace('hours', 'h').replace('hour', 'h').replace('mins', 'min').replace('min', 'min')}More actions
+                {'  '}|  {routeInfo.legs[0].duration.text.replace('hours', 'h').replace('hour', 'h').replace('mins', 'min').replace('min', 'min')}
               </Text>
             </View>
             <TouchableOpacity onPress={() => { setRouteMode('idle'); setRoutePolyline([]); setRouteInfo(null); setRoutePoints({}); setCurrentStepIndex(0); Speech.stop(); }} style={{ marginLeft: 8, backgroundColor: accentColor, borderRadius: 10, padding: 7, alignSelf: 'flex-start' }}>

@@ -16,9 +16,10 @@ export type NearbyUser = {
 /**
  * Hook pour récupérer les utilisateurs proches dans un rayon donné (en mètres) via filtrage géospatial Supabase/PostGIS
  * @param radius Rayon en mètres (par défaut 100m)
+ * @param mode Mode de l'utilisateur ('moto' ou 'auto')
  */
-export function useNearbyUsers(radius: number = 100) {
-  const { location } = useLocation();
+export function useNearbyUsers(radius: number = 100, mode: 'moto' | 'auto' = 'moto') {
+  const { location } = useLocation(mode);
   const [users, setUsers] = useState<NearbyUser[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -55,12 +56,12 @@ export function useNearbyUsers(radius: number = 100) {
         .then(({ data, error }) => {
           setLoading(false);
           // Ajout d'un log détaillé pour debug
-          console.log('[NearbyUsers][Debug] userId:', userId, 'location:', location.coords, 'data:', data, 'error:', error);
+          console.log('[NearbyUsers][Debug] userId:', userId, 'mode:', mode, 'location:', location.coords, 'data:', data, 'error:', error);
           if (error || !data) return;
           setUsers(data);
         });
     })();
-  }, [location, radius]);
+  }, [location, radius, mode]);
 
   return { users, loading };
 }

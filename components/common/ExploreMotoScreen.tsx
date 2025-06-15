@@ -52,7 +52,8 @@ export default function ExploreMotoScreen() {
 
   const { user } = useAuth();
   // Rayon réduit à 60 mètres pour la détection des utilisateurs proches
-  const { users: nearbyUsers, loading: loadingNearby } = useNearbyUsers(60);
+  const mode = 'moto';
+  const { users: nearbyUsers, loading: loadingNearby } = useNearbyUsers(60, mode);
 
   useEffect(() => {
     if (location?.coords) {
@@ -71,7 +72,7 @@ export default function ExploreMotoScreen() {
               lat: location.coords.latitude,
               lng: location.coords.longitude,
               last_seen_at: new Date().toISOString(),
-              mode: 'moto', // Ajout du mode de tracking
+              mode: location.mode, // Correction : toujours utiliser le mode courant
             }).eq('id', user.id);
           }
         })
@@ -195,6 +196,10 @@ export default function ExploreMotoScreen() {
     }).start();
   }, [nearbyUsers.length, location?.coords]);
 
+  // Filtrage des utilisateurs proches par mode courant
+  const sameModeNearby = nearbyUsers.filter(u => u.mode === mode);
+  const totalNearby = nearbyUsers.length;
+
   if (hasConsent === false) {
     return <ConsentModal visible onAccept={acceptConsent} />;
   }
@@ -271,7 +276,7 @@ export default function ExploreMotoScreen() {
           <Text style={[styles.limitLabel, { fontSize: 16 }, isSmallScreen && { fontSize: 11 }]}>Limite de vitesse</Text>
         </View>
         {/* Notification dynamique véhicule à proximité (infos réelles) */}
-        {(nearbyUsers.length > 0 && location && location.coords) && (
+        {(totalNearby > 0 && location && location.coords) && (
           <View style={{
             marginTop: isSmallScreen ? 6 : 16,
             alignSelf: 'center',
@@ -292,38 +297,44 @@ export default function ExploreMotoScreen() {
             elevation: 2,
             opacity: 0.97
           }}>
-            <Ionicons name={nearbyUsers[0].mode === 'auto' ? 'car' : 'bicycle'} size={isSmallScreen ? 20 : 28} color={nearbyUsers[0].mode === 'auto' ? '#60A5FA' : '#A259FF'} style={{ marginRight: 8 }} />
+            <Ionicons name={'bicycle'} size={isSmallScreen ? 20 : 28} color={'#A259FF'} style={{ marginRight: 8 }} />
             <Text style={{
-              color: nearbyUsers[0].mode === 'auto' ? '#60A5FA' : '#A259FF',
+              color: '#A259FF',
               fontWeight: 'bold',
               fontSize: isSmallScreen ? 14 : 18,
               marginRight: 8,
               letterSpacing: 0.5
             }}>
-              {nearbyUsers.length === 1
-                ? (nearbyUsers[0].mode === 'auto' ? 'Voiture à proximité' : 'Moto à proximité')
-                : `${nearbyUsers.filter(u => u.mode === nearbyUsers[0].mode).length} ${nearbyUsers[0].mode === 'auto' ? 'voitures' : 'motos'} à proximité`}
+              {sameModeNearby.length === 0
+                ? 'Aucun motard à proximité'
+                : sameModeNearby.length === 1
+                  ? '1 moto à proximité'
+                  : `${sameModeNearby.length} motos à proximité`}
+              {totalNearby > sameModeNearby.length &&
+                <Text style={{ color: '#aaa', fontWeight: 'normal', fontSize: isSmallScreen ? 12 : 14 }}>  |  {totalNearby} au total</Text>}
             </Text>
-            <View style={{
-              backgroundColor: nearbyUsers[0].mode === 'auto' ? '#60A5FA' : '#A259FF',
-              borderRadius: 8,
-              paddingHorizontal: 10,
-              paddingVertical: 4,
-              marginLeft: 4
-            }}>
-              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: isSmallScreen ? 12 : 14 }}>
-                {Math.round(haversine(location.coords.latitude, location.coords.longitude, nearbyUsers[0].lat, nearbyUsers[0].lng))} m
-              </Text>
-            </View>
+            {sameModeNearby[0] && (
+              <View style={{
+                backgroundColor: '#A259FF',
+                borderRadius: 8,
+                paddingHorizontal: 10,
+                paddingVertical: 4,
+                marginLeft: 4
+              }}>
+                <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: isSmallScreen ? 12 : 14 }}>
+                  {Math.round(haversine(location.coords.latitude, location.coords.longitude, sameModeNearby[0].lat, sameModeNearby[0].lng))} m
+                </Text>
+              </View>
+            )}
             <Animated.View style={{
               marginLeft: 8,
               width: isSmallScreen ? 10 : 16,
               height: isSmallScreen ? 10 : 16,
               borderRadius: 99,
-              backgroundColor: nearbyUsers[0].mode === 'auto' ? '#60A5FA' : '#A259FF',
+              backgroundColor: '#A259FF',
               opacity: 0.7,
               transform: [{ scale: 1.2 }],
-              shadowColor: nearbyUsers[0].mode === 'auto' ? '#60A5FA' : '#A259FF',
+              shadowColor: '#A259FF',
               shadowOpacity: 0.5,
               shadowRadius: 8
             }} />
