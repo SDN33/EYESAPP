@@ -822,7 +822,7 @@ export default function CustomMapView({ color = "#A259FF", mode = 'moto', nearby
                   Arrivée : {routeInfo.legs[0].end_address}
                 </Text>
                 <Text style={{ fontSize: 14, color: colorScheme === 'dark' ? '#d1d5db' : '#666', marginBottom: 16 }}>
-                  Durée : {routeInfo.legs[0].duration.text.replace('hours', 'h').replace('hour', 'h').replace('mins', 'min').replace('min', 'min')} | Distance : {formatDistance(routeInfo.legs[0].distance.text)}
+                  Durée : {routeInfo.legs[0].duration.text.replace('hours', 'h').replace('hour', 'h').replace('mins', 'min')} | Distance : {formatDistance(routeInfo.legs[0].distance.text)}
                 </Text>
                 {/* Options d'itinéraire */}
                 <Text style={{ fontWeight: 'bold', color: accentColor, fontSize: 15, marginBottom: 12 }}>Options d'itinéraire</Text>
