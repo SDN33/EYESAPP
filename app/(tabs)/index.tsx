@@ -10,6 +10,7 @@ import { useThemeMode } from '../../hooks/ThemeContext';
 import { Colors } from '../../constants/Colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ModeTutorial, { ModeType } from '../../components/common/ModeTutorial';
+import { activateKeepAwake, deactivateKeepAwake } from 'expo-keep-awake';
 
 export default function ExploreScreen() {
   const { hasConsent, acceptConsent } = useConsent();
@@ -57,6 +58,13 @@ export default function ExploreScreen() {
   // Affichage du tutoriel à chaque démarrage
   useEffect(() => {
     setShowTuto(true);
+  }, []);
+
+  useEffect(() => {
+    activateKeepAwake();
+    return () => {
+      deactivateKeepAwake();
+    };
   }, []);
 
   if (hasConsent === false) {

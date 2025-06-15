@@ -25,14 +25,18 @@ export default function CommunityScreen() {
   const bgColor = Colors[colorScheme].background;
   const textColor = Colors[colorScheme].text;
 
+  // Pagination côté communauté (scalabilité)
+  const PAGE_SIZE = 10;
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+
   useEffect(() => {
-    // Utilise un proxy CORS côté web uniquement
+    let isMounted = true;
     const fetchPosts = async () => {
       try {
         let data;
         if (Platform.OS === 'web') {
-          // Proxy CORS pour le web
-          const query = encodeURIComponent('*[_type == "post"]{_id, title, slug, publishedAt, image, body}');
+          const query = encodeURIComponent(`*[_type == "post"] | order(publishedAt desc)[${(page-1)*PAGE_SIZE}...${page*PAGE_SIZE}]{_id, title, slug, publishedAt, image, body}`);
           const projectId = 'o23wpsz2';
           const dataset = 'production';
           const url = `https://corsproxy.io/?https://${projectId}.api.sanity.io/v2025-06-04/data/query/${dataset}?query=${query}`;
@@ -41,17 +45,23 @@ export default function CommunityScreen() {
           const json = await res.json();
           data = json.result;
         } else {
-          data = await sanityClient.fetch(`*[_type == "post"]{_id, title, slug, publishedAt, image, body}`);
+          data = await sanityClient.fetch(`*[_type == "post"] | order(publishedAt desc)[${(page-1)*PAGE_SIZE}...${page*PAGE_SIZE}]{_id, title, slug, publishedAt, image, body}`);
         }
-        setPosts(data);
-        setLoading(false);
+        if (isMounted) {
+          setPosts(prev => page === 1 ? data : [...prev, ...data]);
+          setHasMore(data.length === PAGE_SIZE);
+          setLoading(false);
+        }
       } catch (err: any) {
-        setError(err.message || "Erreur de chargement");
-        setLoading(false);
+        if (isMounted) {
+          setError(err.message || "Erreur de chargement");
+          setLoading(false);
+        }
       }
     };
     fetchPosts();
-  }, []);
+    return () => { isMounted = false; };
+  }, [page]);
 
   // Utilitaire pour obtenir l'URL de l'image Sanity (robuste)
   function getSanityImageUrl(image: any) {
@@ -88,9 +98,21 @@ export default function CommunityScreen() {
   }
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: Colors[colorScheme].background, paddingTop: 48 }} contentContainerStyle={{ flexGrow: 1 }}>
+    <ScrollView
+      style={{ flex: 1, backgroundColor: Colors[colorScheme].background, paddingTop: 48 }}
+      contentContainerStyle={{ flexGrow: 1 }}
+      onMomentumScrollEnd={e => {
+        const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+        if (hasMore && layoutMeasurement.height + contentOffset.y >= contentSize.height - 40) {
+          setPage(p => hasMore ? p + 1 : p);
+        }
+      }}
+    >
       <View style={{ flex: 1 }}>
-        <View style={{ backgroundColor: Colors[colorScheme].background, paddingTop: 0 }}>
+        <View style={{ backgroundColor: Colors[colorScheme].background, paddingTop: 10 }}>
+          <View style={{ alignItems: 'center', marginBottom: 10 }}>
+            <Image source={require('../../assets/images/EYES_Horizontal.pdf-removebg-preview.png')} style={{ width: 170, height: 85, borderRadius: 16, marginBottom: 2, marginTop: -10, shadowColor: '#A259FF', shadowOpacity: 0.13, shadowRadius: 10, backgroundColor: '#23242A' }} resizeMode="contain" />
+          </View>
           <Text
             style={{
               color: textColor,
