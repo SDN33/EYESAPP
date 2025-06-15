@@ -198,7 +198,7 @@ export default function ExploreVoitureScreen() {
 
   return (
     <SafeAreaView
-      style={{ flex: 1, backgroundColor: Colors[colorScheme]?.background ?? (colorScheme === 'dark' ? '#111216' : '#fff') }}
+      style={{ flex: 1, backgroundColor: '#111216' }}
       edges={['left', 'right']}
     >
       {/* Haut : Compteur moderne + météo */}
@@ -397,8 +397,8 @@ export default function ExploreVoitureScreen() {
       {/* Overlay adresse actuelle en bas, en overlay absolu pour ne pas crop la map */}
       {/* Affichage unique de l'adresse, sans doublon ni version colorée */}
       {address && address.trim() !== '' ? (
-        <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: 12, alignItems: "center", backgroundColor: colorScheme === 'dark' ? "#181A20EE" : "#fff", opacity: colorScheme === 'dark' ? 0.93 : 0.98, borderTopLeftRadius: 16, borderTopRightRadius: 16, zIndex: 20, shadowColor: '#000', shadowOpacity: 0.10, shadowRadius: 8 }}>
-          <Text style={{ color: colorScheme === 'dark' ? '#fff' : '#23242A', fontSize: 15, fontWeight: '500', textAlign: 'center' }} numberOfLines={2}>
+        <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: 12, alignItems: "center", backgroundColor: "#181A20EE", opacity: 0.93, borderTopLeftRadius: 16, borderTopRightRadius: 16, zIndex: 20, shadowColor: '#000', shadowOpacity: 0.10, shadowRadius: 8 }}>
+          <Text style={{ color: '#fff', fontSize: 15, fontWeight: '500', textAlign: 'center' }} numberOfLines={2}>
             {address}
           </Text>
         </View>
